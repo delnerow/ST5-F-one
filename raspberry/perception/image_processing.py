@@ -1,0 +1,113 @@
+import cv2
+import numpy as np
+
+# Paramètres (ligne)
+TAILLE_FLOU = (5, 5)      # TP : (9,9)  -> plus petit, l'image est plus petite
+ECART = 60                # TP : seuil fixe 180 -> ici la ligne doit être 60 niveaux de gris
+                          #      plus claire que le sol (le sol = médiane de l'image)
+NOYAU = np.ones((3, 3), np.uint8)   # TP : 9x9
+ITERATIONS = 1            # TP : 12     -> 1 suffit et coûte beaucoup moins cher
+HAUT_ZONE = 0.6           # CORRIGÉ : find_line ne regarde que le bas de l'image (40 % du bas)
+AIRE_MIN = 100            # AJOUT : contour trop petit = poussière, pas la ligne
+# Paramètres (intersection)
+ZONE_HAUT = 0.2      # on cherche l'intersection entre 20 % et 90 % de la hauteur de l'image
+ZONE_BAS = 0.9
+RATIO = 2.5          # une rangée est "transversale" si elle a 2,5 fois plus de blanc que d'habitude
+RANGEES_MIN = 3      # il faut au moins 3 rangées transversales (sinon c'est du bruit)
+BORD = 0.08          # CORRIGÉ : une branche latérale doit arriver à moins de 8 % du bord de l'image
+
+
+def traitement(image):
+    """1er traitement de l'image, commun à la ligne et à l'intersection."""
+    h, w = image.shape[:2]
+    # Convert to gray scale image
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+    # Blur and threshold
+    blur = cv2.blur(gray, TAILLE_FLOU)
+    # AJOUT : seuil relatif. Le sol occupe la majorité de l'image, donc la médiane donne
+    # son niveau de gris ; la ligne doit être nettement plus claire que lui.
+    # Le seuil s'adapte ainsi tout seul à l'éclairage (sol clair ou sombre).
+    seuil = np.median(blur) + ECART
+    ret, thresh = cv2.threshold(blur, seuil, 255, cv2.THRESH_BINARY)
+
+    # Remove noise with morphological processing
+    eroded_mask = cv2.erode(thresh, NOYAU, iterations=ITERATIONS)
+    closed_mask = cv2.dilate(eroded_mask, NOYAU, iterations=ITERATIONS)
+    return closed_mask, h
+
+
+def find_line(closed_mask, h):
+    # CORRIGÉ : comme avant, on ne garde que le bas de l'image (ligne juste devant le robot)
+    bas = closed_mask[int(HAUT_ZONE * h):, :]
+
+    # Find the different contours
+    contours, hierarchy = cv2.findContours(bas, cv2.RETR_EXTERNAL,
+                                           cv2.CHAIN_APPROX_SIMPLE)
+    if len(contours) == 0:
+        return None
+
+    # Biggest area = the line
+    biggest = max(contours, key=cv2.contourArea)
+    if cv2.contourArea(biggest) < AIRE_MIN:      # AJOUT : rejette les petites taches
+        return None
+
+    # Compute barycenter
+    M = cv2.moments(biggest)
+    cx = int(M['m10'] / M['m00'])
+    cy = int(M['m01'] / M['m00']) + int(HAUT_ZONE * h)   # coordonnée dans l'image entière
+    return cx, cy
+
+
+def find_intersection(closed_mask, h):
+    w = closed_mask.shape[1]          
+
+    # 1. Nombre de pixels blancs sur chaque rangée de la zone étudiée
+    y0, y1 = int(ZONE_HAUT * h), int(ZONE_BAS * h)
+    blancs_par_rangee = np.count_nonzero(closed_mask[y0:y1, :], axis=1)
+    rangees_avec_ligne = blancs_par_rangee[blancs_par_rangee > 0]
+    if len(rangees_avec_ligne) < 10:
+        return None                       # presque pas de ligne visible : on ne conclut rien
+
+    # 2. Largeur habituelle de la ligne = médiane des rangées
+    #    (la plupart des rangées ne contiennent que la ligne, la transversale est minoritaire)
+    largeur_ligne = np.median(rangees_avec_ligne)
+
+    # 3. Rangées "transversales" : beaucoup plus de blanc que d'habitude
+    rangees = np.where(blancs_par_rangee > RATIO * largeur_ligne)[0]
+    if len(rangees) < RANGEES_MIN:
+        return None                       # pas de ligne transversale : pas d'intersection
+    y_trans = y0 + int(np.median(rangees))
+
+    # 4. Position de la ligne sous la transversale (barycentre, comme find_line)
+    dessous = closed_mask[y_trans + 5:y1, :]
+    M = cv2.moments(dessous, binaryImage=True)
+    if M['m00'] == 0:
+        return None
+    cx = M['m10'] / M['m00']
+
+    # 5. Branches à gauche et à droite : la transversale atteint-elle le bord de l'image ?
+    #    CORRIGÉ : une vraie branche fait 80 cm à 1 m, elle sort du champ de la caméra ;
+    #    un bout de ruban qui dépasse de 2-3 cm, non. On prend toutes les rangées de la
+    #    transversale (+/- 3) pour bien voir une ligne posée de travers.
+    bande = closed_mask[max(0, y0 + rangees.min() - 3):y0 + rangees.max() + 4, :]
+    colonnes_blanches = np.where(bande.max(axis=0) > 0)[0]
+    gauche = colonnes_blanches.min() < BORD * w
+    droite = colonnes_blanches.max() > (1 - BORD) * w
+
+    # 6. Branche devant : la ligne continue-t-elle au-dessus de la transversale ?
+    #    CORRIGÉ : on regarde nettement plus haut (15 à 30 % de la hauteur au-dessus),
+    #    sinon un bout de ruban qui dépasse est pris pour une branche.
+    haut = max(0, y_trans - int(0.30 * h))
+    bas = max(0, y_trans - int(0.15 * h))
+    x_min = int(max(0, cx - 3 * largeur_ligne))
+    x_max = int(min(w, cx + 3 * largeur_ligne))
+    au_dessus = closed_mask[haut:bas, x_min:x_max]
+    devant = au_dessus.shape[0] > 0 and np.mean(au_dessus.max(axis=1) > 0) > 0.5
+
+    # CORRIGÉ : une transversale sans aucune branche confirmée n'est pas exploitable
+    if not (gauche or droite or devant):
+        return None
+
+    return {'gauche': bool(gauche), 'droite': bool(droite), 'devant': bool(devant),
+            'distance': round(1 - y_trans / h, 2)}
