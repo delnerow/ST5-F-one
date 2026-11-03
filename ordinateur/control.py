@@ -42,9 +42,11 @@ def main():
 
 
 def ask_mission():
-    kind = input("Mission (g = grille, h = huit) : ").strip().lower()
+    kind = input("Mission (g = grille, h = huit, d = debug caméra) : ").strip().lower()
     if kind.startswith('h'):
         return {"type": "huit"}
+    if kind.startswith('d'):
+        return {"type": "debug"}
     sx, sy = map(int, input("Origine x y : ").split())
     heading = input("Cap de départ (N/E/S/W) : ").strip().upper()
     gx, gy = map(int, input("Destination x y : ").split())

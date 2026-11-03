@@ -79,6 +79,7 @@ Dans `control.py`, saisir `m` pour envoyer une mission :
 
 - **Circuit en huit** : choisir `h`. Le robot suit la ligne et franchit les intersections en continuant tout droit lorsque cette branche est détectée.
 - **Grille** : choisir `g`, puis saisir les coordonnées de départ `x y`, le cap initial (`N`, `E`, `S` ou `W`) et les coordonnées de destination `x y`.
+- **Debug caméra** : choisir `d`. Le Raspberry Pi n’ouvre pas la liaison Arduino et n’envoie aucune commande moteur. Une fenêtre affiche côte à côte l’image annotée (ligne et branches détectées) et le masque traité, avec une nouvelle capture toutes les deux secondes. Appuyez sur `q` dans la fenêtre pour fermer le mode debug, ou envoyez `s` depuis `control.py`.
 
 Les nœuds de la grille sont indexés à partir de zéro : `N` augmente `y` et `E` augmente `x`. La taille par défaut est `4 × 4` (`GRID_W` et `GRID_H` dans `raspberry/config.py`). Les coordonnées de départ et de destination doivent être dans la grille.
 

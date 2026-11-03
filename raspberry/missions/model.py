@@ -18,8 +18,8 @@ class Mission:
     @classmethod
     def from_dict(cls, d):
         kind = d.get("type")
-        if kind == "huit":
-            return cls(kind="huit")
+        if kind in ("huit", "debug"):
+            return cls(kind=kind)
         if kind == "grille":
             start = tuple(int(v) for v in d["start"])
             goal = tuple(int(v) for v in d["goal"])
