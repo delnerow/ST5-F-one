@@ -81,6 +81,11 @@ class Driver:
             return True
         return False
 
+    def demarrer(self):
+        """Coup de démarrage : plus de puissance pendant TEMPS_DEMARRAGE pour vaincre les frottements."""
+        self.moteurs(cfg.VITESSE_DEMARRAGE, cfg.VITESSE_DEMARRAGE)
+        time.sleep(cfg.TEMPS_DEMARRAGE)
+
     # -- boucle ------------------------------------------------------------------
     def _suivre_ligne(self, ligne, vitesse):
         if ligne is None:               # ligne perdue : l'Arduino garde la dernière consigne
