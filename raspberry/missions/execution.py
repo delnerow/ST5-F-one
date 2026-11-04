@@ -232,6 +232,7 @@ def run_grille(mission, drv, odo, link):
 
 def run_huit(mission, drv, odo, link):
     """Parcours en 8 : on suit la ligne et on traverse le croisement tout droit."""
+    drv.detecter_intersections = False      # sur le 8 : pas de croisement à gérer, suivi de ligne pur
     link.send_event("mission_started", mission="huit")
     link.send_event("driver_state", state=drv.etat)
     while not link.stop_event.is_set():
