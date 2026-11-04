@@ -98,7 +98,7 @@ class Driver:
 
         if self.etat == "SUIVI":
             self._suivre_ligne(ligne, cfg.VITESSE)
-            inter = find_intersection(closed_mask, h)
+            inter = find_intersection(closed_mask, h) if self.detecter_intersections else None
             if inter is not None and inter['distance'] < cfg.DISTANCE_DETECTION:
                 self.votes = {d: 0 for d in DIRECTIONS}
                 self.nb_images = 0
