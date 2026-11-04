@@ -20,7 +20,9 @@ CAMERA_HFLIP, CAMERA_VFLIP = 1, 1
 VITESSE = 70                     # PWM, entre -255 et 255
 KP = 35
 ZONE_MORTE = 0.08
-
+KI = 0                           # terme intégral (0 = désactivé)
+KD = 0                           # terme dérivé (0 = désactivé)
+INTEGRALE_MAX = 0.5              # limite de l'intégrale, pour qu'elle ne s'emballe pas
 # ---------------------------------------------------------------- intersections
 VITESSE_LENTE = 45
 VITESSE_ROTATION = 70
