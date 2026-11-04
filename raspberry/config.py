@@ -40,4 +40,11 @@ ENCODER_SIGN = 1                 # mettre -1 si GetSpeed() est négatif en march
 APPROACH_OFFSET_M = 0.10         # (À CALIBRER) distance restant à parcourir entre l'événement
                                  # "intersection vue" et le centre du carrefour (phase AVANCE)
 MAX_K_ERROR = 0.7                # écart max (en cases) entre l'encodeur et un nœud candidat
+
+# ---------------------------------------------------------------- obstacles (ultrasons)
+OBSTACLE_MIN_DISTANCE_CM = 20
+OBSTACLE_MAX_DISTANCE_CM = 200
+OBSTACLE_CONFIRMATION_MEASURES = 5
+OBSTACLE_FIRST_INTERSECTION_MAX_CM = 140
+OBSTACLE_SECOND_INTERSECTION_MIN_CM = 160
 LOG_PERIOD_S = 1.0
