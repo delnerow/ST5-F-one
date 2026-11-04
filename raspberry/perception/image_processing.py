@@ -12,7 +12,7 @@ AIRE_MIN = 100            # AJOUT : contour trop petit = poussière, pas la lign
 # Paramètres (intersection)
 ZONE_HAUT = 0.2      # on cherche l'intersection entre 20 % et 90 % de la hauteur de l'image
 ZONE_BAS = 0.9
-RATIO = 2.5          # une rangée est "transversale" si elle a 2,5 fois plus de blanc que d'habitude
+RATIO = 1.5          # une rangée est transversale si son blanc continu depuis un bord dépasse 1,5 fois la ligne
 RANGEES_MIN = 3      # il faut au moins 3 rangées transversales (sinon c'est du bruit)
 BORD = 0.08          # CORRIGÉ : une branche latérale doit arriver à moins de 8 % du bord de l'image
 
@@ -69,24 +69,37 @@ def find_intersection(closed_mask, h):
     if len(rangees_avec_ligne) < 10:
         return None                       # presque pas de ligne visible : on ne conclut rien
 
-    # 2. Largeur habituelle de la ligne = médiane des rangées
-    #    (la plupart des rangées ne contiennent que la ligne, la transversale est minoritaire)
-    largeur_ligne = np.median(rangees_avec_ligne)
+    # 2. Longueur de blanc CONTINU depuis le bord gauche et depuis le bord droit, rangée par rangée.
+    #    Une branche fait 80 cm à 1 m : elle part toujours du bord de l'image et rejoint la ligne.
+    #    Une tache ou un reflet près du bord donne un blanc court, la ligne seule aussi.
+    zone = closed_mask[y0:y1, :] > 0
+    blanc_depuis_gauche = np.where(zone.all(axis=1), w, np.argmin(zone, axis=1))
+    blanc_depuis_droite = np.where(zone.all(axis=1), w, np.argmin(zone[:, ::-1], axis=1))
+    touche_bord = (blanc_depuis_gauche > 0) | (blanc_depuis_droite > 0)
 
-    # 3. Rangées "transversales" : beaucoup plus de blanc que d'habitude
-    rangees = np.where(blancs_par_rangee > RATIO * largeur_ligne)[0]
+    # 3. Largeur habituelle de la ligne = médiane des rangées qui ne touchent pas un bord
+    #    (la barre transversale est exclue, même quand elle occupe beaucoup de rangées)
+    largeur_interieur = blancs_par_rangee[(blancs_par_rangee > 0) & ~touche_bord]
+    if len(largeur_interieur) < 5:
+        return None                       # pas assez de ligne "normale" pour comparer
+    largeur_ligne = np.median(largeur_interieur)
+
+    # 4. Rangées transversales : blanc continu depuis un bord, nettement plus long que la ligne.
+    #    Plus besoin de 2,5 fois la ligne : une branche courte (robot décentré, L) suffit.
+    plus_long = np.maximum(blanc_depuis_gauche, blanc_depuis_droite)
+    rangees = np.where(plus_long > RATIO * largeur_ligne)[0]
     if len(rangees) < RANGEES_MIN:
         return None                       # pas de ligne transversale : pas d'intersection
     y_trans = y0 + int(np.median(rangees))
 
-    # 4. Position de la ligne sous la transversale (barycentre, comme find_line)
+    # 5. Position de la ligne sous la transversale (barycentre, comme find_line)
     dessous = closed_mask[y_trans + 5:y1, :]
     M = cv2.moments(dessous, binaryImage=True)
     if M['m00'] == 0:
         return None
     cx = M['m10'] / M['m00']
 
-    # 5. Branches à gauche et à droite : la transversale atteint-elle le bord de l'image ?
+    # 6. Branches à gauche et à droite : la transversale atteint-elle le bord de l'image ?
     #    CORRIGÉ : une vraie branche fait 80 cm à 1 m, elle sort du champ de la caméra ;
     #    un bout de ruban qui dépasse de 2-3 cm, non. On prend toutes les rangées de la
     #    transversale (+/- 3) pour bien voir une ligne posée de travers.
@@ -95,7 +108,7 @@ def find_intersection(closed_mask, h):
     gauche = colonnes_blanches.min() < BORD * w
     droite = colonnes_blanches.max() > (1 - BORD) * w
 
-    # 6. Branche devant : la ligne continue-t-elle au-dessus de la transversale ?
+    # 7. Branche devant : la ligne continue-t-elle au-dessus de la transversale ?
     #    CORRIGÉ : on regarde nettement plus haut (15 à 30 % de la hauteur au-dessus),
     #    sinon un bout de ruban qui dépasse est pris pour une branche.
     haut = max(0, y_trans - int(0.30 * h))
