@@ -65,14 +65,25 @@ class Driver:
         self.etat, self.debut = "TOURNE", time.perf_counter()
 
     # -- boucle ------------------------------------------------------------------
-    def _suivre_ligne(self, ligne, vitesse):
+        def _suivre_ligne(self, ligne, vitesse):
         if ligne is None:               # ligne perdue : l'Arduino garde la dernière consigne
             return
         cx, _ = ligne
         erreur = (cx - cfg.LARGEUR / 2) / (cfg.LARGEUR / 2)
         if abs(erreur) < cfg.ZONE_MORTE:
             erreur = 0
-        correction = cfg.KP * erreur
+
+        t = time.perf_counter()
+        if self.erreur_prec is None:    # première image après un virage : pas encore de I ni de D
+            derivee = 0.0
+        else:
+            dt = max(t - self.t_prec, 1e-3)
+            self.integrale += erreur * dt
+            self.integrale = max(-cfg.INTEGRALE_MAX, min(cfg.INTEGRALE_MAX, self.integrale))
+            derivee = (erreur - self.erreur_prec) / dt
+        self.erreur_prec, self.t_prec = erreur, t
+
+        correction = cfg.KP * erreur + cfg.KI * self.integrale + cfg.KD * derivee
         self.moteurs(vitesse + correction, vitesse - correction)
 
     def step(self):
