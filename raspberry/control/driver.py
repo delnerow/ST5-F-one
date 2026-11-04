@@ -30,6 +30,7 @@ class Driver:
         self.debut = 0.0
         self.votes = {d: 0 for d in DIRECTIONS}
         self.nb_images = 0
+        self.sans_inter = 0
 
     @property
     def straight(self):
@@ -87,6 +88,7 @@ class Driver:
             if inter is not None and inter['distance'] < cfg.DISTANCE_DETECTION:
                 self.votes = {d: 0 for d in DIRECTIONS}
                 self.nb_images = 0
+                self.sans_inter = 0
                 self.etat = "APPROCHE"
 
         elif self.etat == "APPROCHE":
