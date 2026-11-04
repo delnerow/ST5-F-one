@@ -14,7 +14,7 @@ DEBUG_CAPTURE_INTERVAL_S = 2.0   # période entre deux captures en mode debug
 # ---------------------------------------------------------------- matériel
 ARDUINO_PORT = '/dev/ttyACM0'
 LARGEUR, HAUTEUR = 320, 240
-CAMERA_HFLIP, CAMERA_VFLIP = 0, 0
+CAMERA_HFLIP, CAMERA_VFLIP = 1, 1
 
 # ---------------------------------------------------------------- suivi de ligne
 VITESSE = 70                     # PWM, entre -255 et 255
