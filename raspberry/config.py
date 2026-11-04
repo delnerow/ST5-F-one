@@ -23,8 +23,8 @@ ZONE_MORTE = 0.08
 
 # ---------------------------------------------------------------- intersections
 VITESSE_LENTE = 45
-VITESSE_ROTATION = 70
-DISTANCE_DETECTION = 0.5
+VITESSE_ROTATION = 40
+DISTANCE_DETECTION = 1
 TEMPS_FINAL = 1.0
 TEMPS_MIN_ROTATION = 0.5
 ERREUR_ALIGNEE = 0.15
