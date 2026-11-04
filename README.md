@@ -85,6 +85,8 @@ Les nœuds de la grille sont indexés à partir de zéro : `N` augmente `y` et `
 
 Pendant une mission, envoyer `q` ou `s` depuis l’interface pour demander l’arrêt du robot. `q` permet également de quitter l’interface. Gardez toujours le robot sous surveillance et prévoyez un moyen d’arrêt physique indépendant.
 
+Pendant une mission sur grille, le Raspberry Pi transmet au serveur les estimations de position (coordonnées de grille, nœud candidat, cap, distance et confiance) ainsi que les transitions d’état du driver et les événements de mission/intersection. Les messages sont affichés dans le terminal du serveur. Ils sont transportés avec les requêtes périodiques de touches afin que le thread propriétaire de la socket ZeroMQ reste le seul à l’utiliser.
+
 ## Calibrage et limites
 
 - Mesurez et ajustez `CELL_M`, `ENCODER_SCALE`, `ENCODER_SIGN` et `APPROACH_OFFSET_M` dans `raspberry/config.py` pour la piste et les encodeurs utilisés.

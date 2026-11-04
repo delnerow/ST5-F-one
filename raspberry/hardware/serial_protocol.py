@@ -21,7 +21,7 @@ def WaitACK(arduino):
     rep=b''
     while rep==b'':					# waiting acknowledgement of B2
         rep=arduino.readline()
-    print(rep.decode())
+    #print(rep.decode())
 
 def sendCmdi(arduino,cmd,arg1,arg2,arg3,arg4): # send command with 4 ints
     arduino.write(cmd)

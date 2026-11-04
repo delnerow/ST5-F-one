@@ -21,7 +21,7 @@ unsigned char deltaMax = 10;  // maximum gap between 2 successive values
 // gestion du multitache. définition de la période de chaque tache
 // definition du nombre de taches maximales
 #define numtask 3
-int deltask[numtask]={0,1000,500} ;
+int deltask[numtask]={0,1000,20} ;
 int timtask[numtask] ;
 bool taskon[numtask]={true,false,true} ;
 void task0(); // tache permanente de lecture de la liaison série 

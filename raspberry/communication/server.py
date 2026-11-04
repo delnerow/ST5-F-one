@@ -10,6 +10,7 @@
 
 import threading
 import time
+from queue import Empty, Queue
 
 import zmq
 
@@ -25,6 +26,9 @@ class ServerLink:
         self.stop_event = threading.Event()     # levé quand control.py envoie une touche d'arrêt
         self._closing = threading.Event()
         self._thread = None
+        self._updates = Queue()
+        self._update_id = 0
+        self._update_id_lock = threading.Lock()
         self._open()
 
     # -- bas niveau --------------------------------------------------------
@@ -70,14 +74,42 @@ class ServerLink:
         """Thread qui lit les touches de control.py. Après cet appel, seul ce thread
         utilise la socket (une socket ZMQ ne se partage pas entre threads)."""
         def loop():
+            pending_updates = []
             while not self._closing.is_set():
-                reply = self.request({"cmd": "key"})
+                while True:
+                    try:
+                        pending_updates.append(self._updates.get_nowait())
+                    except Empty:
+                        break
+
+                reply = self.request({"cmd": "key", "updates": pending_updates})
+                if reply is not None:
+                    pending_updates.clear()
                 if reply and reply.get("key") in cfg.STOP_KEYS:
                     print("Touche d'arrêt reçue.")
                     self.stop_event.set()
                 self._closing.wait(cfg.KEY_POLL_S)
         self._thread = threading.Thread(target=loop, daemon=True)
         self._thread.start()
+
+    def send_position(self, **position):
+        """Queue a position update for transmission by the socket-owning listener thread."""
+        self._queue_update({"type": "position", "timestamp": time.time(), **position})
+
+    def send_event(self, event, **details):
+        """Queue a mission/state event for transmission by the listener thread."""
+        self._queue_update({
+            "type": "event",
+            "timestamp": time.time(),
+            "event": event,
+            **details,
+        })
+
+    def _queue_update(self, update):
+        with self._update_id_lock:
+            self._update_id += 1
+            update["id"] = self._update_id
+        self._updates.put(update)
 
     def close(self):
         self._closing.set()

@@ -80,6 +80,23 @@ def process_msg(msg):
 
     elif msg_type["key request from robot"]:
         print("key request from {}".format(msg["from"]))
+        for update in msg.get("updates", []):
+            update_type = update.get("type")
+            if update_type == "position":
+                print(
+                    "[{}] position: ({:.2f}, {:.2f}) node={} cap={} "
+                    "distance={:.2f} m confiance={}".format(
+                        msg["from"],
+                        update.get("x", 0.0),
+                        update.get("y", 0.0),
+                        update.get("candidate_node", update.get("node")),
+                        update.get("heading", "?"),
+                        update.get("distance_m", 0.0),
+                        update.get("confidence", "?"),
+                    )
+                )
+            elif update_type == "event":
+                print("[{}] événement: {}".format(msg["from"], update))
         reply = {"key": key}
         key = ''
 

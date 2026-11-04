@@ -124,7 +124,7 @@ void QUADMOTOR_code() {
   if (obst==false)
         RetAcquit(F("OK Moteurs mis aux consignes : "),nivM1,nivM2,nivM3,nivM4);
   else
-        RetAcquit(F("OB stacle détecté moteur non allumé"));
+        RetAcquit(F("Obstacle détecté moteur non allumé"));
 
 }
 

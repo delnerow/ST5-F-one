@@ -31,7 +31,7 @@ class arduino:
         if rep.split()[0]==b'OK':
             self.serialport.write(b'I0')
             WaitACK(self.serialport)
-            print(rep.decode())
+            #print(rep.decode())
             return True
         else:
             return False
