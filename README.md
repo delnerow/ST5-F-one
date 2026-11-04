@@ -87,6 +87,8 @@ Pendant une mission, saisir `r` dans `control.py` pour abandonner la mission : l
 
 Pendant une mission sur grille, le Raspberry Pi transmet au serveur les estimations de position (coordonnées de grille, nœud candidat, cap, distance et confiance) ainsi que les transitions d’état du driver et les événements de mission/intersection. Les messages sont affichés dans le terminal du serveur. Ils sont transportés avec les requêtes périodiques de touches afin que le thread propriétaire de la socket ZeroMQ reste le seul à l’utiliser.
 
+La carte Arduino ne transmet pas de données spontanément : elle répond aux requêtes du Raspberry Pi. Toute activité série entrante (commande moteur ou lecture de capteurs) renouvelle le watchdog. Si aucune activité n’est reçue pendant 750 ms alors qu’une consigne moteur est non nulle, l’Arduino arrête et verrouille les moteurs; il ignore ensuite les commandes de mouvement jusqu’à une nouvelle connexion explicite. Les attentes d’acquittement série du Raspberry Pi expirent après 0,5 s et lèvent `TimeoutError`. Ce watchdog doit être validé sur banc, roues levées, avant tout essai sur piste; il ne remplace pas un arrêt d’urgence matériel.
+
 ## Calibrage et limites
 
 - Mesurez et ajustez `CELL_M`, `ENCODER_SCALE`, `ENCODER_SIGN` et `APPROACH_OFFSET_M` dans `raspberry/config.py` pour la piste et les encodeurs utilisés.

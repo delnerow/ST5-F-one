@@ -48,14 +48,18 @@ def main():
     except KeyboardInterrupt:
         print("Arrêt demandé")
     finally:
-        if arduino is not None:
+        try:
+            if arduino is not None:
+                try:
+                    arduino.Stop()
+                finally:
+                    arduino.disconnect()
+        finally:
             try:
-                arduino.Stop()
+                if camera is not None:
+                    camera.stop()
             finally:
-                arduino.disconnect()
-        if camera is not None:
-            camera.stop()
-        link.close()
+                link.close()
 
 
 if __name__ == "__main__":

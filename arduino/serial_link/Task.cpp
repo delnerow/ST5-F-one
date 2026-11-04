@@ -3,6 +3,7 @@
 #include "Motor.h"
 #include "MyServo.h"
 #include "Commandes.h"
+#include "Task.h"
 
 // on définit ici toutes les variables auxquelles doivent accéder les taches
 void init_arduino();
@@ -21,11 +22,13 @@ unsigned char deltaMax = 10;  // maximum gap between 2 successive values
 // gestion du multitache. définition de la période de chaque tache
 // definition du nombre de taches maximales
 #define numtask 3
-int deltask[numtask]={0,1000,20} ;
+int deltask[numtask]={0,50,20} ;
 int timtask[numtask] ;
 bool taskon[numtask]={true,false,true} ;
+unsigned long lastSerialActivityMs = 0;
+bool watchdogTripped = false;
 void task0(); // tache permanente de lecture de la liaison série 
-void task1(); // tache du chien de garde
+void task1(); // arrête les moteurs si la liaison série est perdue
 void task2(); // tache de transition douce pour les moteurs
 
 
@@ -77,6 +80,7 @@ void task0() {
   if (Serial.available() > 0) {
     // on lit le premier caractère qui arrive
     CharIn = Serial.read();
+    lastSerialActivityMs = millis();
     if ((CharIn=='A') || (ConnOn)) decod_serial(CharIn);  // on ne fait un decodage de commande que si on est connecté
   }
 
@@ -84,7 +88,28 @@ void task0() {
 
 // tache du chien de garde  
 void task1() {
-  // A COMPLETER
+  if (!ConnOn || watchdogTripped) return;
+
+  bool motorsCommanded = false;
+  for (int i = 0; i < 4; i++) {
+    if (setpoint[i] != 0) {
+      motorsCommanded = true;
+      break;
+    }
+  }
+
+  if (motorsCommanded &&
+      (unsigned long)(millis() - lastSerialActivityMs) > SERIAL_WATCHDOG_TIMEOUT_MS) {
+    for (int i = 0; i < 4; i++) {
+      setpoint[i] = 0;
+      value[i] = 0;
+    }
+    FRmotor.setvalue(0);
+    FLmotor.setvalue(0);
+    RRmotor.setvalue(0);
+    RLmotor.setvalue(0);
+    watchdogTripped = true;  // Require an explicit reconnect before accepting motor commands.
+  }
 }
 
 void task2() {
@@ -106,4 +131,3 @@ void task2() {
   RRmotor.setvalue(value[2]);
   RLmotor.setvalue(value[3]);
 }
-
