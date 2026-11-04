@@ -34,6 +34,7 @@ class Driver:
         self.erreur_prec = None       # erreur de l'image précédente (terme D)
         self.t_prec = 0.0
         self.sans_inter = 0
+        self.detecter_intersections = True   # False sur le 8 : suivi de ligne pur
 
     @property
     def straight(self):
