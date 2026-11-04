@@ -98,12 +98,7 @@ class Driver:
             erreur = erreur - cfg.ZONE_MORTE/2
         elif erreur < 0 :
             erreur = erreur  + cfg.ZONE_MORTE/2
-        
-
-        
-        self.erreur_prec, self.t_prec = erreur, t
-
-        correction = cfg.KP * erreur + cfg.KI * self.integrale + cfg.KD * derivee
+        correction = cfg.KP * erreur 
         self.moteurs(vitesse + correction, vitesse - correction)
 
     def step(self):
