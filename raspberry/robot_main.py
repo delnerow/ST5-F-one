@@ -29,7 +29,7 @@ def main():
             from missions.debug import run_debug
 
             camera = open_camera()
-            run_debug(camera, link.stop_event)
+            run_debug(camera, link.stop_event, link)
         else:
             from control.driver import Driver
             from hardware.devices import open_arduino
