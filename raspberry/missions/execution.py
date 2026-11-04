@@ -235,6 +235,7 @@ def run_huit(mission, drv, odo, link):
     drv.detecter_intersections = False      # sur le 8 : pas de croisement à gérer, suivi de ligne pur
     link.send_event("mission_started", mission="huit")
     link.send_event("driver_state", state=drv.etat)
+    drv.demarrer()
     while not link.stop_event.is_set():
         event = _step_and_report(drv, link)
         if event and event[0] == "INTERSECTION":
