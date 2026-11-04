@@ -149,6 +149,7 @@ class Driver:
                     if self.quarts > 0:
                         self.debut = t          # quart de tour suivant : on quitte d'abord la ligne
                     else:
+                        self.integrale, self.erreur_prec = 0.0, None
                         self.etat = "SUIVI"
                         return ("TURN_DONE", None)
         return None
