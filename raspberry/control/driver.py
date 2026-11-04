@@ -98,7 +98,10 @@ class Driver:
                 self.nb_images += 1
                 for d in self.votes:
                     self.votes[d] += inter[d]
-            else:        # l'intersection est passée sous le robot : majorité des images
+                self.sans_inter = 0
+            else:
+                self.sans_inter += 1
+            if self.sans_inter >= cfg.IMAGES_SANS_INTER:
                 branches = [d for d in DIRECTIONS if self.votes[d] > self.nb_images / 2]
                 if not branches:
                     self.etat = "SUIVI"
