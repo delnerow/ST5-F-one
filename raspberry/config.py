@@ -28,7 +28,7 @@ DISTANCE_DETECTION = 1
 TEMPS_FINAL = 1.0
 TEMPS_MIN_ROTATION = 0.5
 ERREUR_ALIGNEE = 0.15
-
+IMAGES_SANS_INTER = 10
 # ---------------------------------------------------------------- grille
 GRID_W, GRID_H = 4, 4            # nombre d'intersections en x et en y (la mission peut l'écraser)
 CELL_M = 1.0                     # (À CALIBRER) distance entre deux intersections voisines, en m
