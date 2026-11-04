@@ -89,6 +89,11 @@ class Driver:
         erreur = (cx - cfg.LARGEUR / 2) / (cfg.LARGEUR / 2)
         if abs(erreur) < cfg.ZONE_MORTE:
             erreur = 0
+        elif erreur > 0
+            erreur = erreur - cfg.ZONE_MORTE/2
+        elif erreur < 0
+            erreur = erreur  + cfg.ZONE_MORTE/2
+        
 
         t = time.perf_counter()
         if self.erreur_prec is None:    # première image après un virage : pas encore de I ni de D
