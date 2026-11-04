@@ -83,7 +83,7 @@ Dans `control.py`, saisir `m` pour envoyer une mission :
 
 Les nœuds de la grille sont indexés à partir de zéro : `N` augmente `y` et `E` augmente `x`. La taille par défaut est `4 × 4` (`GRID_W` et `GRID_H` dans `raspberry/config.py`). Les coordonnées de départ et de destination doivent être dans la grille.
 
-Pendant une mission, envoyer `q` ou `s` depuis l’interface pour demander l’arrêt du robot. `q` permet également de quitter l’interface. Gardez toujours le robot sous surveillance et prévoyez un moyen d’arrêt physique indépendant.
+Pendant une mission, saisir `r` dans `control.py` pour abandonner la mission : le driver arrête les moteurs, passe en état `ARRET` et ne reprend plus de capture caméra; le programme libère ensuite la caméra et l’Arduino. `q` quitte l’interface de commande sans remplacer l’arrêt d’urgence matériel. Gardez toujours le robot sous surveillance et prévoyez un moyen d’arrêt physique indépendant.
 
 Pendant une mission sur grille, le Raspberry Pi transmet au serveur les estimations de position (coordonnées de grille, nœud candidat, cap, distance et confiance) ainsi que les transitions d’état du driver et les événements de mission/intersection. Les messages sont affichés dans le terminal du serveur. Ils sont transportés avec les requêtes périodiques de touches afin que le thread propriétaire de la socket ZeroMQ reste le seul à l’utiliser.
 

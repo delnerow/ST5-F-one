@@ -8,7 +8,7 @@ SERVER_PORT = 5005
 REQUEST_TIMEOUT_MS = 2000        # pas de réponse du serveur -> on recrée la socket
 MISSION_POLL_S = 1.0             # fréquence de demande de mission
 KEY_POLL_S = 0.5                 # fréquence de lecture des touches pendant la mission
-STOP_KEYS = ('q', 's')           # touche envoyée par control.py = arrêt d'urgence
+STOP_KEYS = ('q', 's', 'r')      # touches d'arrêt reçues depuis control.py
 DEBUG_CAPTURE_INTERVAL_S = 2.0   # période entre deux captures en mode debug
 
 # ---------------------------------------------------------------- matériel

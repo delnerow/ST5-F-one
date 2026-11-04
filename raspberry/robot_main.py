@@ -19,7 +19,7 @@ def main():
     link = ServerLink(ip, robot_id)
     link.register()
     mission = link.wait_for_mission()
-    link.start_key_listener()                 # arrêt d'urgence depuis control.py ('q' ou 's')
+    link.start_key_listener()                 # arrêt de mission depuis control.py ('r')
 
     # imports ici : picamera2 / cv2 ne sont chargés qu'une fois la mission connue
     arduino = camera = None
@@ -40,7 +40,7 @@ def main():
             from hardware.devices import open_camera
 
             camera = open_camera()
-            drv, odo = Driver(arduino, camera), Odometry(arduino)
+            drv, odo = Driver(arduino, camera, link.stop_event), Odometry(arduino)
             run = run_grille if mission.kind == 'grille' else run_huit
             ok = run(mission, drv, odo, link)
             print("Mission accomplie." if ok else "Mission interrompue.")

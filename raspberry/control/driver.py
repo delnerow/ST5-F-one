@@ -21,8 +21,9 @@ DIRECTIONS = ['gauche', 'devant', 'droite']
 
 
 class Driver:
-    def __init__(self, car, camera):
+    def __init__(self, car, camera, stop_event=None):
         self.car, self.camera = car, camera
+        self.stop_event = stop_event
         self.etat = "SUIVI"
         self.choix = None
         self.sens = None              # 'gauche' ou 'droite' pendant une rotation
@@ -43,6 +44,9 @@ class Driver:
 
     # -- moteurs ---------------------------------------------------------------
     def moteurs(self, gauche, droite):
+        if self.stop_event is not None and self.stop_event.is_set():
+            gauche = droite = 0
+            self.etat = "ARRET"
         g = int(max(-255, min(255, gauche)))
         d = int(max(-255, min(255, droite)))
         # ordre dans serial_link : avant droit, avant gauche, arrière droit, arrière gauche
@@ -62,8 +66,20 @@ class Driver:
 
     def turn_in_place(self, sens, quarts=1):
         """Pivote sur place (au départ de la mission). quarts=2 pour faire demi-tour."""
+        if self.stop_event is not None and self.stop_event.is_set():
+            self.stop()
+            self.etat = "ARRET"
+            return
         self.sens, self.quarts = sens, quarts
         self.etat, self.debut = "TOURNE", time.perf_counter()
+
+    def _abort_if_requested(self):
+        if self.stop_event is not None and self.stop_event.is_set():
+            if self.etat != "ARRET":
+                self.stop()
+                self.etat = "ARRET"
+            return True
+        return False
 
     # -- boucle ------------------------------------------------------------------
     def _suivre_ligne(self, ligne, vitesse):
@@ -88,14 +104,20 @@ class Driver:
         self.moteurs(vitesse + correction, vitesse - correction)
 
     def step(self):
+        if self._abort_if_requested():
+            return ("ABORTED", None)
         if self.etat in ("ATTENTE", "ARRET"):
             time.sleep(0.02)
             return None
 
         array = self.camera.capture_array("main")
+        if self._abort_if_requested():
+            return ("ABORTED", None)
         t = time.perf_counter()
         closed_mask, h = traitement(array)
         ligne = find_line(closed_mask, h)
+        if self._abort_if_requested():
+            return ("ABORTED", None)
 
         if self.etat == "SUIVI":
             self._suivre_ligne(ligne, cfg.VITESSE)

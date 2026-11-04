@@ -25,10 +25,10 @@ def main():
     
 
     print("Welcome to control.py")
-    print("Press enter to validate your command and send it to the server")
+    print("Press 'r' to abort the current mission, or 'q' to quit.")
     cmd_char = ''
     while cmd_char != 'q':
-        input_str = input("Enter your command (press 'q' to exit): ")
+        input_str = input("Command (m = mission, r = abort mission, q = quit): ")
         if input_str != '':
             cmd_char = input_str[0]
             if cmd_char == 'm':             # nouvelle mission
