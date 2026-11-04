@@ -30,6 +30,9 @@ class Driver:
         self.debut = 0.0
         self.votes = {d: 0 for d in DIRECTIONS}
         self.nb_images = 0
+        self.integrale = 0.0          # erreur accumulée (terme I)
+        self.erreur_prec = None       # erreur de l'image précédente (terme D)
+        self.t_prec = 0.0
         self.sans_inter = 0
 
     @property
