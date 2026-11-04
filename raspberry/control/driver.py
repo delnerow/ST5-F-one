@@ -66,7 +66,7 @@ class Driver:
         self.etat, self.debut = "TOURNE", time.perf_counter()
 
     # -- boucle ------------------------------------------------------------------
-        def _suivre_ligne(self, ligne, vitesse):
+    def _suivre_ligne(self, ligne, vitesse):
         if ligne is None:               # ligne perdue : l'Arduino garde la dernière consigne
             return
         cx, _ = ligne
