@@ -19,6 +19,8 @@ CAMERA_HFLIP, CAMERA_VFLIP = 1, 1
 # ---------------------------------------------------------------- suivi de ligne
 VITESSE = 70                     # PWM, entre -255 et 255
 KP = 35
+VITESSE_DEMARRAGE = 100          # (À RÉGLER) consigne pendant le coup de démarrage
+TEMPS_DEMARRAGE = 0.5            # s
 ZONE_MORTE = 0.08
 KI = 0                           # terme intégral (0 = désactivé)
 KD = 0                           # terme dérivé (0 = désactivé)
