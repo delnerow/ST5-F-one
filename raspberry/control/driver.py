@@ -21,7 +21,7 @@
 import time
 
 import config as cfg
-from hardware.serial_protocol import ArduinoStop, sendCmdi
+from hardware.serial_protocol import ArduinoStop,retrCmdi,sendCmdi
 from perception.image_processing import traitement, find_line, find_intersection
 
 DIRECTIONS = ['gauche', 'devant', 'droite']
