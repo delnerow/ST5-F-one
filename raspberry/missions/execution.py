@@ -37,6 +37,18 @@ def _choose_and_report(drv, link, choice):
     previous_state = drv.etat
     drv.choose(choice)
     _report_state_transition(drv, link, previous_state)
+    
+def _attendre_obstacle(drv, link):
+    """Robot arrêté devant un obstacle : attend jusqu'à ATTENTE_OBSTACLE_S qu'il parte.
+    Renvoie True si l'Arduino répond "libre" MESURES_LIBRES fois de suite."""
+    debut, libres = time.perf_counter(), 0
+    while time.perf_counter() - debut < cfg.ATTENTE_OBSTACLE_S and not link.stop_event.is_set():
+        _, etat = drv.etat_ultrason()
+        libres = libres + 1 if etat == 0 else 0
+        if libres >= cfg.MESURES_LIBRES:
+            return True
+        time.sleep(0.1)
+    return False
 
 
 def _interrupt(drv, link, mission):
