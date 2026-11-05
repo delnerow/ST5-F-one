@@ -44,7 +44,9 @@ class Driver:
         self.sans_inter = 0
         self.detecter_intersections = True   # False sur le 8 : suivi de ligne pur
         self.cause_arret = None       # 'watchdog', 'obstacle', 'muet' ou None (opérateur)
-
+        self.obstacle = False         # True quand l'Arduino a répondu "OB" à une commande moteurs
+        self.obstacle_confirme = False  # obstacle resté plus de ATTENTE_OBSTACLE_S : pas la peine de réattendre
+        self.ligne_quittee = False    # demi-tour : la ligne de départ a-t-elle été quittée ?
     @property
     def straight(self):
         """Vrai quand le robot roule droit (l'odométrie n'a de sens que dans ce cas)."""
