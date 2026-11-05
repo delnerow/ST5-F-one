@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Optional, Tuple
 
 import config as cfg
-from navigation.grid_map import HEADINGS
+from navigation.grid_map import HEADINGS, step
 
 
 @dataclass
@@ -16,6 +16,7 @@ class Mission:
     grid_size: Tuple[int, int] = (cfg.GRID_W, cfg.GRID_H)
     blocked_nodes: Tuple[Tuple[int, int], ...] = ()
     blocked_edges: Tuple[Tuple[Tuple[int, int], Tuple[int, int]], ...] = ()
+    initial_route: Optional[Tuple[Tuple[Tuple[int, int], Optional[str]], ...]] = None
 
     @classmethod
     def from_dict(cls, d):
@@ -51,6 +52,19 @@ class Mission:
                     raise ValueError(f"les extrémités du segment ne sont pas voisines : {edge!r}")
                 blocked_edges.append((first, second))
 
+            initial_route = None
+            if "initial_route" in d:
+                initial_route = _parse_initial_route(d["initial_route"], start, goal, size)
+                blocked_node_set = set(blocked_nodes)
+                blocked_edge_set = {frozenset(edge) for edge in blocked_edges}
+                for (node, heading), (next_node, _) in zip(initial_route, initial_route[1:]):
+                    if node in blocked_node_set or next_node in blocked_node_set:
+                        raise ValueError(f"itinéraire initial traversant un nœud bloqué : {node} -> {next_node}")
+                    if frozenset((node, next_node)) in blocked_edge_set:
+                        raise ValueError(f"itinéraire initial traversant un segment bloqué : {node} -> {next_node}")
+                    if heading is None or step(node, heading) != next_node:
+                        raise ValueError(f"itinéraire initial invalide entre {node} et {next_node}")
+
             return cls(
                 kind="grille",
                 start=start,
@@ -59,6 +73,7 @@ class Mission:
                 grid_size=size,
                 blocked_nodes=blocked_nodes,
                 blocked_edges=tuple(blocked_edges),
+                initial_route=initial_route,
             )
         raise ValueError(f"type de mission inconnu : {kind!r}")
 
@@ -75,3 +90,27 @@ def _parse_node(value, label):
 def _validate_in_bounds(node, size, label):
     if not (0 <= node[0] < size[0] and 0 <= node[1] < size[1]):
         raise ValueError(f"{label} {node} hors de la grille {size}")
+
+
+def _parse_initial_route(value, start, goal, size):
+    if not isinstance(value, (list, tuple)) or not value:
+        raise ValueError("itinéraire initial vide ou invalide")
+
+    route = []
+    for entry in value:
+        if not isinstance(entry, (list, tuple)) or len(entry) != 2:
+            raise ValueError(f"étape d'itinéraire invalide : {entry!r}")
+        node = _parse_node(entry[0], "itinéraire initial")
+        _validate_in_bounds(node, size, "itinéraire initial")
+        heading = entry[1]
+        if heading is not None:
+            heading = str(heading).upper()
+            if heading not in HEADINGS:
+                raise ValueError(f"cap invalide dans l'itinéraire initial : {heading!r}")
+        route.append((node, heading))
+
+    if route[0][0] != start or route[-1] != (goal, None):
+        raise ValueError("l'itinéraire initial doit partir du départ et terminer à destination")
+    if any(heading is None for _, heading in route[:-1]):
+        raise ValueError("seule la dernière étape peut avoir un cap nul")
+    return tuple(route)

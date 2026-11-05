@@ -20,6 +20,9 @@ import time
 
 import zmq
 
+HEADINGS = ("N", "E", "S", "W")
+DELTA = {"N": (0, 1), "E": (1, 0), "S": (0, -1), "W": (-1, 0)}
+
 server_ip = "192.168.137.1"
 verbose_mode = False
 nodes = list()
@@ -30,6 +33,105 @@ delivered = set()      # robots qui ont déjà reçu cette mission
 ui_updates = queue.Queue()
 server_stopping = threading.Event()
 last_position_log = {}
+
+
+def compute_initial_grid_route(grid_mission):
+    """Plan a shortest route using the mission's known blocked nodes and edges."""
+    width, height = grid_mission.get("grid_size", (4, 4))
+    start = tuple(grid_mission["start"])
+    goal = tuple(grid_mission["goal"])
+    heading = str(grid_mission["heading"]).upper()
+    if not isinstance(width, int) or not isinstance(height, int) or width < 1 or height < 1:
+        raise ValueError("grid_size must contain positive integers")
+    if heading not in HEADINGS:
+        raise ValueError(f"unknown initial heading: {heading!r}")
+
+    def in_bounds(node):
+        return 0 <= node[0] < width and 0 <= node[1] < height
+
+    for label, node in (("start", start), ("goal", goal)):
+        if len(node) != 2 or not all(isinstance(value, int) for value in node) or not in_bounds(node):
+            raise ValueError(f"{label} node {node!r} is outside the grid")
+
+    blocked_nodes = {tuple(node) for node in grid_mission.get("blocked_nodes", ())}
+    for node in blocked_nodes:
+        if len(node) != 2 or not all(isinstance(value, int) for value in node) or not in_bounds(node):
+            raise ValueError(f"blocked node {node!r} is outside the grid")
+    blocked_edges = set()
+    for edge in grid_mission.get("blocked_edges", ()):
+        if not isinstance(edge, (list, tuple)) or len(edge) != 2:
+            raise ValueError(f"invalid blocked edge: {edge!r}")
+        first, second = tuple(edge[0]), tuple(edge[1])
+        if (
+            len(first) != 2
+            or len(second) != 2
+            or not in_bounds(first)
+            or not in_bounds(second)
+            or abs(first[0] - second[0]) + abs(first[1] - second[1]) != 1
+        ):
+            raise ValueError(f"invalid blocked edge: {edge!r}")
+        blocked_edges.add(frozenset((first, second)))
+
+    def can_move(node, direction):
+        dx, dy = DELTA[direction]
+        next_node = (node[0] + dx, node[1] + dy)
+        edge = frozenset((node, next_node))
+        return (
+            in_bounds(next_node)
+            and node not in blocked_nodes
+            and next_node not in blocked_nodes
+            and edge not in blocked_edges
+        )
+
+    if start == goal:
+        return [[list(start), None]]
+
+    heading_index = HEADINGS.index(heading)
+    initial_headings = (
+        heading,
+        HEADINGS[(heading_index - 1) % 4],
+        HEADINGS[(heading_index + 1) % 4],
+        HEADINGS[(heading_index + 2) % 4],
+    )
+    queue = []
+    previous = {}
+    for initial_heading in initial_headings:
+        state = (start, initial_heading)
+        if can_move(start, initial_heading) and state not in previous:
+            previous[state] = None
+            queue.append(state)
+
+    cursor = 0
+    while cursor < len(queue):
+        node, current_heading = queue[cursor]
+        cursor += 1
+        dx, dy = DELTA[current_heading]
+        next_node = (node[0] + dx, node[1] + dy)
+        if next_node == goal:
+            states = []
+            state = (node, current_heading)
+            while state is not None:
+                states.append(state)
+                state = previous[state]
+            states.reverse()
+            states.append((goal, None))
+            return [[list(route_node), route_heading] for route_node, route_heading in states]
+
+        current_index = HEADINGS.index(current_heading)
+        next_headings = (
+            current_heading,
+            HEADINGS[(current_index - 1) % 4],
+            HEADINGS[(current_index + 1) % 4],
+        )
+        for next_heading in next_headings:
+            if not can_move(next_node, next_heading):
+                continue
+            next_state = (next_node, next_heading)
+            if next_state not in previous:
+                previous[next_state] = (node, current_heading)
+                queue.append(next_state)
+
+    raise ValueError(f"no route from {start} to {goal} with the known obstacles")
 
 
 def main():
@@ -147,7 +249,16 @@ def process_msg(msg):
             key = msg["key"]
             print(key)
         if (msg["cmd"] == "mission"):
-            mission = msg["mission"]
+            new_mission = msg["mission"]
+            if new_mission.get("type") == "grille":
+                try:
+                    new_mission = dict(new_mission)
+                    new_mission["initial_route"] = compute_initial_grid_route(new_mission)
+                except (KeyError, TypeError, ValueError) as error:
+                    print(f"Grid mission rejected: {error}")
+                    return {"error": str(error)}
+                print("Initial route:", " -> ".join(str(entry[0]) for entry in new_mission["initial_route"]))
+            mission = new_mission
             delivered.clear()
             ui_updates.put(("mission_submitted", mission))
             print("new mission: {}".format(mission))

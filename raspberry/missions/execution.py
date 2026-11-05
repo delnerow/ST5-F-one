@@ -212,10 +212,13 @@ def run_grille(mission, drv, odo, link):
         link.send_event("mission_completed", mission="grille", result="already_at_goal")
         return True
 
-    route = plan_path(grid, loc.node, loc.heading, goal)    # ValueError si impossible
+    route = mission.initial_route or plan_path(grid, loc.node, loc.heading, goal)
     route_index = 0
     route_revision = grid.revision
-    print("Itinéraire :", " -> ".join(f"{n}" for n, _ in route))
+    print(
+        "Itinéraire initial du serveur :" if mission.initial_route else "Itinéraire :",
+        " -> ".join(f"{n}" for n, _ in route),
+    )
     link.send_position(
         x=float(loc.node[0]),
         y=float(loc.node[1]),

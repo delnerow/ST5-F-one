@@ -36,7 +36,12 @@ def main():
                 try:
                     mission = ask_mission()
                     if mission is not None:
-                        send_message(server_socket, {"cmd": "mission", "mission": mission})
+                        reply = send_message(
+                            server_socket,
+                            {"cmd": "mission", "mission": mission},
+                        )
+                        if reply and "error" in reply:
+                            print(f"Mission refusée par le serveur : {reply['error']}")
                 except (ValueError, RuntimeError) as error:
                     print(f"Mission non envoyée : {error}")
             elif cmd_char != 'q':

@@ -11,7 +11,7 @@ Le système est réparti sur trois composants :
 | `raspberry/` | Programme principal du robot : communication avec le serveur, caméra, traitement d’image, suivi de ligne, odométrie, localisation et planification d’itinéraire. |
 | `arduino/serial_link/` | Programme de la carte Arduino/Bluno : commande des quatre moteurs, lecture des encodeurs et communication série avec le Raspberry Pi. |
 
-Le Raspberry Pi attend une mission avant d’initialiser l’Arduino et la caméra. Pour une mission sur grille, il détecte les branches aux intersections, met à jour la carte et recalcule l’itinéraire si nécessaire.
+Le Raspberry Pi attend une mission avant d’initialiser l’Arduino et la caméra. Pour une mission sur grille, le serveur calcule l’itinéraire initial en tenant compte des obstacles connus et le transmet au robot. Pendant le déplacement, le Raspberry Pi met à jour la carte à partir des intersections et recalcule localement l’itinéraire lorsqu’un obstacle ou une nouvelle information modifie les passages disponibles.
 
 ## Prérequis
 
