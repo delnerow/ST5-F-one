@@ -72,7 +72,7 @@ def _attendre_obstacle(drv, link):
         time.sleep(0.1)
     return False
     
-def _urgence(drv, link):
+def _urgence(drv, link, on_fixed_obstacle=None):
     """Obstacle signalé par l'Arduino : le robot attend jusqu'à ATTENTE_OBSTACLE_S ;
     s'il part, le robot reprend, sinon il fait demi-tour."""
     drv.stop()
@@ -90,6 +90,8 @@ def _urgence(drv, link):
         return "reprise"
     print("  obstacle toujours là")
     drv.obstacle_confirme = True
+    if on_fixed_obstacle is not None:
+        on_fixed_obstacle()
     if drv.etat not in ("SUIVI", "APPROCHE"):
         if drv.etat == "AVANCE":
             drv.debut = -1e9          # l'avance vers le centre du carrefour se termine tout de suite
@@ -246,9 +248,26 @@ def run_grille(mission, drv, odo, link):
     # 2. Boucle principale
     last_log = 0.0
     bloc_en_attente = None          # route à bloquer après un demi-tour (appliqué au prochain centre)
+
+    def report_fixed_obstacle():
+        blocked_node = step(loc.node, loc.heading)
+        if not grid.in_bounds(blocked_node):
+            print("Obstacle persistant hors de la grille : aucun segment à marquer.", flush=True)
+            return
+        grid.block(loc.node, loc.heading)
+        link.send_event(
+            "fixed_obstacle",
+            blocked_edge=[list(loc.node), list(blocked_node)],
+            source="arduino",
+        )
+        print(
+            f"Obstacle fixe détecté par l'Arduino sur le segment {loc.node} -> {blocked_node}.",
+            flush=True,
+        )
+
     while not link.stop_event.is_set():
         if drv.obstacle:
-            if _urgence(drv, link) == "echec":
+            if _urgence(drv, link, report_fixed_obstacle) == "echec":
                 _interrupt(drv, link, "grille")
                 return False
             odo.update(False)       # le temps passé à l'arrêt ne compte pas comme distance

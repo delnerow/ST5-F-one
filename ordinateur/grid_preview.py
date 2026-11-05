@@ -99,13 +99,49 @@ class GridPreview:
         self._draw()
 
     def show_event(self, event):
+        if event.get("event") == "fixed_obstacle":
+            blocked_edge = event.get("blocked_edge")
+            if self.width is None or not isinstance(blocked_edge, (list, tuple)) or len(blocked_edge) != 2:
+                return
+            try:
+                first = self._valid_node(blocked_edge[0], self.width, self.height)
+                second = self._valid_node(blocked_edge[1], self.width, self.height)
+            except ValueError:
+                return
+            if abs(first[0] - second[0]) + abs(first[1] - second[1]) != 1:
+                return
+            self.fixed_obstacles.add(tuple(sorted((first, second))))
+            self.status.config(text=f"Fixed obstacle detected by Arduino: {first} -> {second}")
+            self._draw()
+            return
+
         messages = {
             "mission_completed": "Mission completed",
             "mission_stopped": "Mission stopped",
             "mission_interrupted": "Mission interrupted",
         }
-        if event.get("event") in messages:
-            self.status.config(text=messages[event["event"]])
+        event_name = event.get("event")
+        if event_name not in messages:
+            return
+
+        final_node = event.get("node")
+        if final_node is None and event_name == "mission_completed":
+            final_node = self.goal
+        if final_node is not None and self.width is not None:
+            try:
+                final_node = self._valid_node(final_node, self.width, self.height)
+            except ValueError:
+                final_node = None
+            if final_node is not None:
+                point = (float(final_node[0]), float(final_node[1]))
+                if not self.path or math.dist(self.path[-1], point) >= 0.02:
+                    self.path.append(point)
+                self.position = point
+                self.target = None
+                self.planned_path = []
+
+        self.status.config(text=messages[event_name])
+        self._draw()
 
     def hide(self):
         self._reset()
@@ -121,6 +157,7 @@ class GridPreview:
         self.target = None
         self.planned_path = []
         self.path = []
+        self.fixed_obstacles = set()
         if hasattr(self, "canvas"):
             self.canvas.delete("all")
             self.status.config(text="")
@@ -191,6 +228,36 @@ class GridPreview:
                 width=5,
                 capstyle=tk.ROUND,
                 joinstyle=tk.ROUND,
+            )
+
+        for first, second in self.fixed_obstacles:
+            x1, y1 = pixel(first)
+            x2, y2 = pixel(second)
+            self.canvas.create_line(
+                x1,
+                y1,
+                x2,
+                y2,
+                fill="#dc2626",
+                width=9,
+                capstyle=tk.ROUND,
+            )
+            midpoint_x, midpoint_y = (x1 + x2) / 2, (y1 + y2) / 2
+            self.canvas.create_line(
+                midpoint_x - 6,
+                midpoint_y - 6,
+                midpoint_x + 6,
+                midpoint_y + 6,
+                fill="white",
+                width=2,
+            )
+            self.canvas.create_line(
+                midpoint_x - 6,
+                midpoint_y + 6,
+                midpoint_x + 6,
+                midpoint_y - 6,
+                fill="white",
+                width=2,
             )
 
         self._draw_marker(self.start, "S", "#2563eb", pixel)
