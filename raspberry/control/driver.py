@@ -82,7 +82,8 @@ class Driver:
 
     def stop(self):
         self.moteurs(0, 0)
-        def etat_ultrason(self):
+        
+    def etat_ultrason(self):
         """Commande S de l'Arduino : (distance en cm, état) avec état 0 = libre, 1 = obstacle,
         2 = capteur muet. Renvoie (None, None) si la réponse est incomplète."""
         try:
