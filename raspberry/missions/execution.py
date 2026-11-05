@@ -306,7 +306,7 @@ def run_huit(mission, drv, odo, link):
     link.send_event("driver_state", state=drv.etat)
     drv.demarrer()
     while not link.stop_event.is_set():
-        if link.urgence_event.is_set() or drv.obstacle:
+        if drv.obstacle:
             if _urgence(drv, link) == "echec":
                 break
             continue
