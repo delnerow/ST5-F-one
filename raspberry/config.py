@@ -34,7 +34,6 @@ IMAGES_SANS_INTER = 10
 # ---------------------------------------------------------------- obstacle : attente puis demi-tour
 ATTENTE_OBSTACLE_S = 3.0         # on attend jusqu'à 3 s que l'obstacle parte avant de faire demi-tour
 MESURES_LIBRES = 3               # obstacle parti si l'Arduino répond "libre" (commande S) 3 fois de suite
-PAUSE_URGENCE_S = 1.0            # touche 'u' : temps à l'arrêt avant le demi-tour
 ERREUR_LIGNE_QUITTEE = 0.5       # demi-tour : ligne de départ quittée quand |erreur| > 0.5 (ou plus vue)
 TEMPS_MAX_DEMI_TOUR = 10.0       # s : si le demi-tour n'a pas retrouvé de ligne, on abandonne
 BLOQUER_SEGMENT_URGENCE = True   # grille : la route où l'obstacle est resté est marquée bloquée
