@@ -1,4 +1,4 @@
-#include "Arduino.h" 
+#include "Arduino.h"
 #include "parameters.h"
 #include "Motor.h"
 #include "MyServo.h"
@@ -10,9 +10,11 @@ extern Motor FRmotor;
 extern Motor FLmotor;
 extern Motor RRmotor;
 extern Motor RLmotor;
-extern long int volatile CoderCount[4] ; 
+extern long int volatile CoderCount[4] ;
 extern bool obst;
 extern MyServo frontservo;
+extern int seuilObst;          // [OBSTACLE] seuil d'arrêt en cm (0 = protection désactivée)
+extern int getDistanceCm();    // [OBSTACLE] défini dans serial_link.ino
 
 int value[4] = {0,0,0,0};  // 'signed PWM' values between -255 and 255
 int setpoint[4] = {0,0,0,0}; // PWM setpoints between -255 and 255
@@ -20,27 +22,28 @@ unsigned char deltaMax = 10;  // maximum gap between 2 successive values
 
 // gestion du multitache. définition de la période de chaque tache
 // definition du nombre de taches maximales
-#define numtask 3
-int deltask[numtask]={0,1000,20} ;
+#define numtask 4                                    // [OBSTACLE] 3 -> 4
+int deltask[numtask]={0,1000,20,OBST_PERIOD_MS} ;    // [OBSTACLE] période de la tâche 3
 int timtask[numtask] ;
-bool taskon[numtask]={true,false,true} ;
-void task0(); // tache permanente de lecture de la liaison série 
+bool taskon[numtask]={true,false,true,true} ;
+void task0(); // tache permanente de lecture de la liaison série
 void task1(); // tache du chien de garde
 void task2(); // tache de transition douce pour les moteurs
+void task3(); // [OBSTACLE] tache de surveillance des obstacles
 
 
-void (*NameTask[numtask])() = {  task0,task1,task2  };
+void (*NameTask[numtask])() = {  task0,task1,task2,task3  };
 
 ///////////////////////////////////////////////////////////////////////////
 //   mise en route et arret des taches périodiques
 /////////////////////////////////////////////////////////////////////////
 void TaskOn(int task)
-{ taskon[task]=true;  
-  timtask[task] = (int)millis()+deltask[task]; 
+{ taskon[task]=true;
+  timtask[task] = (int)millis()+deltask[task];
 }
 
 void TaskOff(int task)
-{ taskon[task]=false;  
+{ taskon[task]=false;
 }
 
 void TaskOffAll() {
@@ -55,7 +58,7 @@ bool TaskState(int task) {
   // lancement des differentes taches périodiques
 void launch_tasks() {
   for (int k=0;k<numtask;k++)
-    if (taskon[k]) 
+    if (taskon[k])
       if ((((int)millis()-timtask[k])>0) || (deltask[k]==0))   // si on a dépassé le temps du prochain lancement ou si tache permanente
       {
         NameTask[k]() ;                   // on lance la tache k
@@ -71,7 +74,7 @@ void launch_tasks() {
 
 extern bool ConnOn ;
 
-// tache permanente de lecture de la liaison série  
+// tache permanente de lecture de la liaison série
 void task0() {
   char CharIn;
   if (Serial.available() > 0) {
@@ -82,7 +85,7 @@ void task0() {
 
 }
 
-// tache du chien de garde  
+// tache du chien de garde
 void task1() {
   // A COMPLETER
 }
@@ -100,10 +103,77 @@ void task2() {
       else
         value[i] -= deltaMax;
   }
-  
-  FRmotor.setvalue(value[0]); // after updating the value to improve reactivity to new setpoints 
+
+  FRmotor.setvalue(value[0]); // after updating the value to improve reactivity to new setpoints
   FLmotor.setvalue(value[1]);
   RRmotor.setvalue(value[2]);
   RLmotor.setvalue(value[3]);
 }
 
+////////////////////////////////////////////////////////////////////
+// [OBSTACLE] tache 3 : surveillance des obstacles (toutes les OBST_PERIOD_MS)
+//
+//  - protection désactivée (seuilObst = 0)    : ne fait rien
+//  - obstacle si distance < seuil sur OBST_N_PROCHE lectures consécutives,
+//    ou si le capteur ne répond plus sur OBST_N_MUET lectures consécutives (sécurité)
+//  - fin d'obstacle si distance > seuil + hystérésis
+//  - en présence d'obstacle, tout mouvement vers l'avant (somme des 4 consignes > 0)
+//    est annulé et freiné rapidement (OBST_DECEL). Le recul, la rotation sur place et
+//    la translation latérale restent autorisés pour se dégager.
+////////////////////////////////////////////////////////////////////
+void task3() {
+  static unsigned char nbMuet = 0;             // lectures "capteur muet" consécutives
+  static unsigned char nbProche = 0;           // lectures "d < seuil" consécutives
+
+  if (seuilObst <= 0) {
+    obst = false;
+    nbMuet = 0;
+    nbProche = 0;
+    return;
+  }
+
+  int d = getDistanceCm();
+
+  // filtre : mise à jour des compteurs de lectures consécutives
+  if (d < 0) {
+    if (nbMuet < OBST_N_MUET) nbMuet++;
+    nbProche = 0;
+  }
+  else if (d < seuilObst) {
+    if (nbProche < OBST_N_PROCHE) nbProche++;
+    nbMuet = 0;
+  }
+  else {
+    nbMuet = 0;
+    nbProche = 0;
+  }
+
+  if (nbMuet >= OBST_N_MUET)                   // capteur muet (OBST_N_MUET lectures de suite)
+    obst = true;
+  else if (nbProche >= OBST_N_PROCHE)          // obstacle trop proche (OBST_N_PROCHE lectures de suite)
+    obst = true;
+  else if (d > seuilObst + OBST_HYSTERESIS)    // voie libre
+    obst = false;
+  // sinon (entre seuil et seuil + hystérésis, ou lecture pas encore confirmée) : on garde l'état précédent
+
+  if (obst && (setpoint[0]+setpoint[1]+setpoint[2]+setpoint[3] > 0)) {
+    for (int i=0; i<4; i++)                    // consigne d'arrêt
+      setpoint[i] = 0;
+  }
+
+  // freinage rapide mais progressif : une coupure brutale de la PWM crée un pic de tension
+  // qui peut éteindre ou abîmer la batterie moteurs (cf. Doc robot - Prise en main).
+  // La valeur baisse de OBST_DECEL à chaque passage (toutes les OBST_PERIOD_MS),
+  // au lieu de deltaMax toutes les 20 ms pour la rampe normale.
+  if (obst && (value[0]+value[1]+value[2]+value[3] > 0)) {
+    for (int i=0; i<4; i++) {
+      if (value[i] > setpoint[i] + OBST_DECEL)       value[i] -= OBST_DECEL;
+      else if (value[i] < setpoint[i] - OBST_DECEL)  value[i] += OBST_DECEL;
+      else                                           value[i] = setpoint[i];
+    }
+    FRmotor.setvalue(value[0]);
+    FLmotor.setvalue(value[1]);
+    RRmotor.setvalue(value[2]);
+    RLmotor.setvalue(value[3]);
+  }
+}

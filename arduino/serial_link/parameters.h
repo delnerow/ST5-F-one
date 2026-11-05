@@ -28,4 +28,16 @@ const int vitMotor4 = 6;  // motor PWM pin
 const int Encoder4B = 21;  // encoder speed pin -> white
 const int Encoder4A = 34;  // encoder direction pin -> yellow
 
+// [OBSTACLE] capteur ultrason URM37 en mode automatique (une mesure toutes les 25 ms)
+const int URM_ECHO = 2;                  // sortie PWM du capteur (fil vert) -> broche 2 (INT0)
+#define URM_TIMEOUT_MS   200             // sans mesure depuis 200 ms -> capteur considéré muet
+#define DIST_HORS_PORTEE 999             // valeur renvoyée quand rien n'est détecté (> 5 m)
+#define OBST_HYSTERESIS  5               // cm au-dessus du seuil pour lever l'obstacle (évite les oscillations)
+#define OBST_PERIOD_MS   30              // période de la tâche de surveillance (ms)
+#define OBST_N_MUET      5               // lectures "capteur muet" consécutives avant de déclarer l'obstacle
+#define OBST_N_PROCHE    2               // lectures "d < seuil" consécutives avant de déclarer l'obstacle
+#define OBST_DECEL       25              // baisse de PWM par période lors d'un arrêt d'urgence :
+                                         // 100 -> 0 en 4 x 30 ms = 120 ms (env. 2 cm de plus)
+                                         // à baisser si la batterie se coupe, à monter pour freiner plus court
+
 #endif

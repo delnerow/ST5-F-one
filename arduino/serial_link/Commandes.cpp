@@ -1,4 +1,4 @@
-#include "Arduino.h" 
+#include "Arduino.h"
 #include "parameters.h"
 #include "Sercomm.h"
 #include "Motor.h"
@@ -15,12 +15,14 @@ extern Motor RLmotor;
 extern int value[4];  // 'signed PWM' values between -255 and 255
 extern int setpoint[4]; // PWM setpoints between -255 and 255
 
-extern long int volatile CoderCount[] ; 
+extern long int volatile CoderCount[] ;
 extern bool obst;
 extern MyServo frontservo;
 extern char feedback ;
 extern char commode ;
 extern bool ConnOn ;
+extern int seuilObst ;          // [OBSTACLE] seuil d'arrêt en cm (0 = désactivé)
+extern int getDistanceCm() ;    // [OBSTACLE] défini dans serial_link.ino
 
 extern void init_arduino() ;
 
@@ -30,7 +32,7 @@ extern void init_arduino() ;
 //
 ///////////////////////////////////////////////////////////////////////////////
 
-void dummy() {  
+void dummy() {
   Serial.println(F("ER")); }
 
 
@@ -45,7 +47,7 @@ void CONNECT_code() {
   commode= GetChar(0);
   if (commode>0) commode-='0'; else commode=0 ;
   if (ConnOn==false)     // on n'est pas encore connecté
-    { 
+    {
     ConnOn = true ;
     init_arduino() ;
     }
@@ -78,10 +80,10 @@ void SINGLEMOTOR_code() {
 
   delay(1); // indispensable et pas trop long
   char m=GetChar(0);
-  //if (m=='1')   mx=&FRmotor; 
-  //else if (m=='2')  mx=&FLmotor; 
-  //else if (m=='3')  mx=&RRmotor; 
-  //else if (m=='4')  mx=&RLmotor; 
+  //if (m=='1')   mx=&FRmotor;
+  //else if (m=='2')  mx=&FLmotor;
+  //else if (m=='3')  mx=&RRmotor;
+  //else if (m=='4')  mx=&RLmotor;
   //if (mx)
   { nivM=GetInt(0) ;              // recupere la valeur de la commande
     GetInt(0) ;
@@ -96,7 +98,7 @@ void SINGLEMOTOR_code() {
     }
   //else
   //  { Serial.readString() ;
-  //  Serial.println(F("Erreur commande incomplète")); 
+  //  Serial.println(F("Erreur commande incomplète"));
   //}
 }
 
@@ -119,12 +121,12 @@ void QUADMOTOR_code() {
   setpoint[1] = nivM2;
   setpoint[2] = nivM3;
   setpoint[3] = nivM4;
-  
+
   //reponse de la commande
   if (obst==false)
         RetAcquit(F("OK Moteurs mis aux consignes : "),nivM1,nivM2,nivM3,nivM4);
   else
-        RetAcquit(F("Obstacle détecté moteur non allumé"));
+        RetAcquit(F("OB stacle détecté moteur non allumé"));
 
 }
 
@@ -137,13 +139,13 @@ void SERVO_code() {
   delay(1); // indispensable et pas trop long
   int pos;
 
-  // onn recupere les paramètres 
+  // onn recupere les paramètres
   pos=GetInt(0) ;  // on recupere la vitesse pour positionner le moteur
   GetInt(0); GetLong(0);
   frontservo.setpos(pos);
-   
+
   // on renvoie la réponse
-  RetAcquit(F("OK servomoteur en "),pos);    
+  RetAcquit(F("OK servomoteur en "),pos);
 }
 
 //////////////////////////////////////////////////////////
@@ -152,33 +154,53 @@ void SERVO_code() {
 void SERVO_minmax() {
   int min,max ;
   delay(1); // indispensable et pas trop long
-  
-  // onn recupere les paramètres 
+
+  // onn recupere les paramètres
   min=GetInt(0) ;  // on recupere la vitesse pour positionner le moteur
   max=GetInt(0);
   GetLong(0);
   frontservo.setmin(min);
   frontservo.setmax(max);
-  
+
   // on renvoie la réponse
   RetAcquit(F("servomoteur min max = "),frontservo.getmin(), frontservo.getmax());
 }
 
 //////////////////////////////////////////////////////////
 // Commande I,i : mise en route de la protection moteur
-// chaque appel à cette commande réinitialise la détection et autorise le redémarrage des moteurs 
+// chaque appel à cette commande réinitialise la détection et autorise le redémarrage des moteurs
+// [OBSTACLE] laissée telle quelle (non fonctionnelle) : la protection ultrason utilise la commande D
 //////////////////////////////////////////////////////////
 
 void PROTECT_IR_code() {
   //delay(1); // indispensable et pas trop long
   //char m=GetChar(0);
   //if (m=='0')   { TaskOff(2) ; obst=false ;   }
-  //else if (m=='1')  { TaskOn(2) ;  obst=false ; }    
+  //else if (m=='1')  { TaskOn(2) ;  obst=false ; }
   //if (feedback==1) Serial.println("OK");
   //if (feedback==2)
   //{  Serial.print(F("OK protection moteur : "));
   //    Serial.println(TaskState(2));    // mise en route de la tache de protection
   //}
+}
+
+//////////////////////////////////////////////////////////
+// [OBSTACLE] Commande D : protection anti-collision par le capteur ultrason
+//   D0   -> protection désactivée
+//   D20  -> protection activée, arrêt sous 20 cm (ASCII)
+//   en binaire : 'D' + 4 entiers 16 bits, seul le premier compte (le seuil)
+// chaque appel réinitialise la détection
+//////////////////////////////////////////////////////////
+
+void PROTECT_US_code() {
+  delay(1); // indispensable et pas trop long
+  int seuil = GetInt(0);
+  GetInt(0); GetLong(0);              // on vide les arguments inutilisés (mode binaire)
+  if (seuil < 0)   seuil = 0;
+  if (seuil > 300) seuil = 300;
+  seuilObst = seuil;
+  obst = false;
+  RetAcquit(F("OK protection obstacle, seuil (cm) = "), seuil);
 }
 
 
@@ -210,8 +232,8 @@ void  ENCODER_TIME_code() {
   long v2 ;
   delay(1); // indispensable et pas trop long sinon le caractère suivant n'est pas arrivé
   char c=GetChar(0);
-  if (c=='1') 
-    v2=CoderCount[0]; 
+  if (c=='1')
+    v2=CoderCount[0];
   else if (c=='2')
     v2=CoderCount[1];
   else if (c=='3')
@@ -239,10 +261,13 @@ void  INFRARED_TIME_code() {
 }
 
 /////////////////////////////////////////////////////////////////////
-// question S,s : renvoie la valeur du capteur ultrasons
+// [OBSTACLE] question S,s : renvoie la distance ultrason et l'état obstacle
+//   réponse : distance (cm) puis obstacle (0 ou 1)
+//   distance = 999 si rien devant, -1 si capteur muet
+//   ASCII : "35 0"    binaire : 4 entiers 16 bits (distance, obstacle, 0, 0)
 /////////////////////////////////////////////////////////////////////
 void  ULTRASON_code() {
- // A COMPLETER
+  Ret2i(getDistanceCm(), obst ? 1 : 0);
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -261,7 +286,7 @@ void (*UpperFn[20])() = {           // tableau des fonctions pour un code en maj
   CONNECT_code,             // A
   empty,                    // B
   QUADMOTOR_code,           // C
-  dummy,                    // D
+  PROTECT_US_code,          // D   [OBSTACLE]
   dummy,                    // E
   dummy,                    // F
   SERVO_code,               // G
@@ -269,7 +294,7 @@ void (*UpperFn[20])() = {           // tableau des fonctions pour un code en maj
   PROTECT_IR_code,dummy,dummy,dummy, // I,J,K,L
   dummy,                    // M
   ENCODERS_FRONT_code,        // N
-  ENCODER_TIME_code,       // O  
+  ENCODER_TIME_code,       // O
   SPEED_QUAD_code,dummy,    // P,Q
   INFRARED_TIME_code,       // R
   ULTRASON_code,            // S
@@ -296,7 +321,7 @@ void (*LowerFn[20])() = {             // tableau des fonctions pour un code en m
   };
 
 
-// fonction de décodage des messages et exécution des codes correspondants 
+// fonction de décodage des messages et exécution des codes correspondants
 void decod_serial(char CharIn)
 {
     if ((CharIn>='A') && (CharIn<='T'))       // pour les fonctions 'majuscule'
@@ -306,4 +331,3 @@ void decod_serial(char CharIn)
     else
       dummy();
 }
-
