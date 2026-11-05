@@ -3,7 +3,7 @@
 import time
 
 import config as cfg
-from navigation.grid_map import GridMap, heading_after, relative
+from navigation.grid_map import HEADINGS, GridMap, heading_after, left_of, relative, right_of, step
 from navigation.localization import Localizer
 from navigation.path_planning import plan_path
 
