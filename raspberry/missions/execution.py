@@ -68,7 +68,7 @@ def _urgence(drv, link):
     print("  obstacle toujours là")
     drv.obstacle_confirme = True
     if drv.etat not in ("SUIVI", "APPROCHE"):
-        if cause == "obstacle" and drv.etat == "AVANCE":
+        if drv.etat == "AVANCE":
             drv.debut = -1e9          # l'avance vers le centre du carrefour se termine tout de suite
             print("  au carrefour : l'avance vers le centre s'arrête ici")
         else:
