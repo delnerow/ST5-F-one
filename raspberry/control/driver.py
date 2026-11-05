@@ -82,7 +82,21 @@ class Driver:
 
     def stop(self):
         self.moteurs(0, 0)
+        def etat_ultrason(self):
+        """Commande S de l'Arduino : (distance en cm, état) avec état 0 = libre, 1 = obstacle,
+        2 = capteur muet. Renvoie (None, None) si la réponse est incomplète."""
+        try:
+            distance, etat, _, _ = retrCmdi(self.car.serialport, b'S')
+        except Exception:                     # réponse incomplète : on vide et on ignore cette mesure
+            self.car.serialport.reset_input_buffer()
+            return None, None
+        return distance, etat
 
+    def demi_tour(self, sens='droite'):
+        """Pivote jusqu'à retrouver la ligne dans l'autre sens :
+        d'abord jusqu'à QUITTER la ligne, puis jusqu'à la retrouver centrée."""
+        self.sens, self.ligne_quittee = sens, False
+        self.etat, self.debut = "DEMI_TOUR", time.perf_counter()
     # -- commandes venant de la mission ---------------------------------------------
     def choose(self, choix):
         """À appeler après un événement INTERSECTION : 'gauche', 'devant', 'droite' ou 'stop'."""
