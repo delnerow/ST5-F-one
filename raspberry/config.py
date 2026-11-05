@@ -30,6 +30,14 @@ TEMPS_FINAL = 0.8
 TEMPS_MIN_ROTATION = 0.5
 ERREUR_ALIGNEE = 0.15
 IMAGES_SANS_INTER = 10
+
+# ---------------------------------------------------------------- obstacle : attente puis demi-tour
+ATTENTE_OBSTACLE_S = 3.0         # on attend jusqu'à 3 s que l'obstacle parte avant de faire demi-tour
+MESURES_LIBRES = 3               # obstacle parti si l'Arduino répond "libre" (commande S) 3 fois de suite
+ERREUR_LIGNE_QUITTEE = 0.5       # demi-tour : ligne de départ quittée quand |erreur| > 0.5 (ou plus vue)
+TEMPS_MAX_DEMI_TOUR = 10.0       # s : si le demi-tour n'a pas retrouvé de ligne, on abandonne
+BLOQUER_SEGMENT_URGENCE = True   # grille : la route où l'obstacle est resté est marquée bloquée
+DISTANCE_PROCHE_INTERSECTION = 0.25  # (À CALIBRER) m : obstacle à moins de 0.25 m du dernier carrefour
 # ---------------------------------------------------------------- grille
 GRID_W, GRID_H = 4, 4            # nombre d'intersections en x et en y (la mission peut l'écraser)
 CELL_M = 1.0                     # (À CALIBRER) distance entre deux intersections voisines, en m
@@ -48,3 +56,6 @@ OBSTACLE_CONFIRMATION_MEASURES = 5
 OBSTACLE_FIRST_INTERSECTION_MAX_CM = 140
 OBSTACLE_SECOND_INTERSECTION_MIN_CM = 160
 LOG_PERIOD_S = 1.0
+ARDUINO_OBSTACLE_STOP_CM = 15    # (À RÉGLER) arrêt d'urgence géré par l'Arduino (commande D).
+                                 # 0 = désactivé. Activé, un capteur ultrason muet bloque
+                                 # aussi l'avance (cause 'muet').

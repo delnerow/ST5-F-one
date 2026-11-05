@@ -3,7 +3,7 @@
 import time
 
 import config as cfg
-from navigation.grid_map import GridMap, heading_after, relative
+from navigation.grid_map import HEADINGS, GridMap, heading_after, left_of, relative, right_of, step
 from navigation.localization import Localizer
 from navigation.path_planning import plan_path
 
@@ -37,6 +37,68 @@ def _choose_and_report(drv, link, choice):
     previous_state = drv.etat
     drv.choose(choice)
     _report_state_transition(drv, link, previous_state)
+    
+def _attendre_obstacle(drv, link):
+    """Robot arrêté devant un obstacle : attend jusqu'à ATTENTE_OBSTACLE_S qu'il parte.
+    Renvoie True si l'Arduino répond "libre" MESURES_LIBRES fois de suite."""
+    debut, libres = time.perf_counter(), 0
+    while time.perf_counter() - debut < cfg.ATTENTE_OBSTACLE_S and not link.stop_event.is_set():
+        _, etat = drv.etat_ultrason()
+        libres = libres + 1 if etat == 0 else 0
+        if libres >= cfg.MESURES_LIBRES:
+            return True
+        time.sleep(0.1)
+    return False
+    
+def _urgence(drv, link):
+    """Renvoie "reprise", "demi_tour", "manoeuvre" ou "echec"."""
+    drv.stop()
+    print("ARRÊT (obstacle)")
+    link.send_event("emergency_stop", state=drv.etat, cause="obstacle")
+    debut_pause = time.perf_counter()
+    libre = False if drv.obstacle_confirme else _attendre_obstacle(drv, link)
+    if link.stop_event.is_set():
+        return "echec"
+    if libre:
+        drv.obstacle = False
+        drv.debut += time.perf_counter() - debut_pause   # une manœuvre en cours reprend là où elle en était
+        print("  obstacle parti : reprise")
+        link.send_event("obstacle_cleared")
+        return "reprise"
+    print("  obstacle toujours là")
+    drv.obstacle_confirme = True
+    if drv.etat not in ("SUIVI", "APPROCHE"):
+        if cause == "obstacle" and drv.etat == "AVANCE":
+            drv.debut = -1e9          # l'avance vers le centre du carrefour se termine tout de suite
+            print("  au carrefour : l'avance vers le centre s'arrête ici")
+        else:
+            drv.debut += time.perf_counter() - debut_pause
+            print("  à une intersection : pas de demi-tour, la manœuvre reprend")
+        drv.obstacle = False
+        return "manoeuvre"
+    previous_state = drv.etat
+    drv.obstacle_confirme = False
+    drv.demi_tour()
+    _report_state_transition(drv, link, previous_state)
+    while not link.stop_event.is_set():
+        ev = _step_and_report(drv, link)
+        if ev and ev[0] == "UTURN_DONE":
+            drv.obstacle = False      # les "OB" reçus pendant la rotation ne comptent pas
+            print("  demi-tour terminé, reprise")
+            link.send_event("uturn_completed")
+            return "demi_tour"
+        if ev and ev[0] == "UTURN_FAILED":
+            print("  demi-tour impossible : ligne non retrouvée")
+            link.send_event("uturn_failed")
+            return "echec"
+    return "echec"
+
+def _interrupt(drv, link, mission):
+    """Arrête les moteurs et signale l'interruption avec sa cause."""
+    drv.stop()
+    cause = drv.cause_arret or "operateur"     # 'watchdog', 'obstacle', 'muet' ou 'operateur'
+    print(f"Mission interrompue ({cause}).")
+    link.send_event("mission_interrupted", mission=mission, cause=cause)
 
 
 def _plan_from(grid, loc, goal):
@@ -129,8 +191,7 @@ def run_grille(mission, drv, odo, link):
             drv.turn_in_place(rel, 1)
         _report_state_transition(drv, link, previous_state)
         if not _wait_event(drv, link, "TURN_DONE"):
-            drv.stop()
-            link.send_event("mission_interrupted", mission="grille")
+            _interrupt(drv, link, "grille")
             return False
         loc.heading = first_h
         link.send_event("heading_changed", heading=loc.heading)
@@ -138,6 +199,7 @@ def run_grille(mission, drv, odo, link):
 
     # 2. Boucle principale
     last_log = 0.0
+    bloc_en_attente = None          # route à bloquer après un demi-tour (appliqué au prochain centre)
     while not link.stop_event.is_set():
         event = _step_and_report(drv, link)
         odo.update(drv.straight)
@@ -226,8 +288,7 @@ def run_grille(mission, drv, odo, link):
             )
             return completed
 
-    drv.stop()
-    link.send_event("mission_interrupted", mission="grille")
+    _interrupt(drv, link, "grille")
     return False
 
 
@@ -245,6 +306,5 @@ def run_huit(mission, drv, odo, link):
             _choose_and_report(
                 drv, link, 'devant' if 'devant' in branches else branches[0]
             )
-    link.send_event("mission_interrupted", mission="huit")
-    drv.stop()
-    return True
+    _interrupt(drv, link, "huit")
+    return drv.cause_arret is None          # arrêt opérateur = fin normale du 8

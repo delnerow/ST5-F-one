@@ -1,15 +1,19 @@
 //////////////////////////////////////////////////////-
 // Ce programme a été développé à CENTRALESUPELEC
 // Merci de conserver ce cartouche
-// Copyright  (c) 2026  CENTRALE-SUPELEC   
+// Copyright  (c) 2026  CENTRALE-SUPELEC
 // Département Electronique et électromagnétisme
 // //////////////////////////////////////////////////-
 //
 // fichier : Arduino_commande_moteurs
-// auteur  : P.BENABES   
+// auteur  : P.BENABES
 // éditeur : M.ROGER
 // Copyright (c) 2026 CENTRALE-SUPELEC
 // Revision: 2.1  Date: 01/11/2026
+//
+// [OBSTACLE] ajouts : mesure ultrason URM37 par interruption,
+//            requête S (distance), commande D (protection), tâche 3 (arrêt de sécurité)
+// [MUET] ajout : état "capteur ultrason muet" séparé de l'état obstacle
 //
 // //////////////////////////////////////////////////-
 //
@@ -34,12 +38,13 @@
 /////////////////////////////////////////////////////////////////////////
 
 bool obst=false ;    // obstacle détecté
+bool muet=false ;    // [MUET] capteur ultrason muet (débranché, en panne)
 bool ConnOn ;        // indique si la carte est connectée
 char feedback ;      // si non nul indique que les commandes doivent renvoyer un acquitement
 char commode=0 ;     // indique le mode de communication 0=tout en ASCII, 1 les commandes sont en binaire et les retours en ascii, 2 tout est en binaire
 
 
-// variables de la gestion des moteurs 
+// variables de la gestion des moteurs
 Motor FRmotor(vitMotor1,dirMotor1,0); // front right
 Motor FLmotor(vitMotor2,dirMotor2,0); // front left
 Motor RRmotor(vitMotor3,dirMotor3,0); // rear right
@@ -50,6 +55,12 @@ long int volatile CoderCount[4] = {0,0,0,0};
 
 // gestion du servomoteur
 MyServo frontservo(ServofrontPin,30,150,10);
+
+// [OBSTACLE] gestion du capteur ultrason
+volatile unsigned long urmPulseStart = 0;     // instant (µs) du début de l'impulsion basse
+volatile unsigned long urmPulseDuration = 0;  // durée (µs) de la dernière impulsion basse : 50 µs = 1 cm
+volatile unsigned long urmLastEcho = 0;       // instant (ms) de la dernière mesure complète
+int seuilObst = 0;                            // seuil d'arrêt en cm ; 0 = protection désactivée
 
 
 ///////////////////////////////////////////////////////////////////////////
@@ -69,8 +80,11 @@ void init_arduino() {
 
   TaskOffAll();
   obst=false ;
+  muet=false ;    // [MUET]
+  seuilObst=0 ;   // [OBSTACLE] protection désactivée à chaque (dé)connexion
   TaskOn(0) ;     // on allume la tache permanente de lecture de la liaison série
   TaskOn(2) ;     // on allume la tache transition douce pour les moteurs
+  TaskOn(3) ;     // [OBSTACLE] on allume la tache de surveillance des obstacles
 }
 
 void setup() {
@@ -80,9 +94,13 @@ void setup() {
   init_arduino() ;
 
   attachInterrupt(digitalPinToInterrupt(Encoder1B), FRcoderISR, FALLING); // interrupt attachment for encoder routines
-  attachInterrupt(digitalPinToInterrupt(Encoder2B), FLcoderISR, FALLING); 
-  attachInterrupt(digitalPinToInterrupt(Encoder3B), RRcoderISR, FALLING); 
-  attachInterrupt(digitalPinToInterrupt(Encoder4B), RLcoderISR, FALLING); 
+  attachInterrupt(digitalPinToInterrupt(Encoder2B), FLcoderISR, FALLING);
+  attachInterrupt(digitalPinToInterrupt(Encoder3B), RRcoderISR, FALLING);
+  attachInterrupt(digitalPinToInterrupt(Encoder4B), RLcoderISR, FALLING);
+
+  // [OBSTACLE] capteur ultrason : on mesure la durée de chaque impulsion basse
+  pinMode(URM_ECHO, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(URM_ECHO), URMechoISR, CHANGE);
 }
 
 ////////////////////////////////////////////////////////////
@@ -103,18 +121,51 @@ void loop() {
 ////////////////////////////////////////////////////////////
 
 void FRcoderISR() {
-  CoderCount[0] += ((digitalRead(Encoder1A) == HIGH) ? +1 : -1);       
+  CoderCount[0] += ((digitalRead(Encoder1A) == HIGH) ? +1 : -1);
 }
 
 void FLcoderISR() {
-  CoderCount[1] += ((digitalRead(Encoder2A) == LOW) ? +1 : -1);       
+  CoderCount[1] += ((digitalRead(Encoder2A) == LOW) ? +1 : -1);
 }
 
 void RRcoderISR() {
-  CoderCount[2] += ((digitalRead(Encoder3A) == HIGH) ? +1 : -1);       
+  CoderCount[2] += ((digitalRead(Encoder3A) == HIGH) ? +1 : -1);
 }
 
 void RLcoderISR() {
-  CoderCount[3] += ((digitalRead(Encoder4A) == LOW) ? +1 : -1);       
+  CoderCount[3] += ((digitalRead(Encoder4A) == LOW) ? +1 : -1);
 }
 
+// [OBSTACLE] front descendant = début de la mesure, front montant = fin de la mesure
+void URMechoISR() {
+  if (digitalRead(URM_ECHO) == LOW)
+    urmPulseStart = micros();
+  else {
+    urmPulseDuration = micros() - urmPulseStart;
+    urmLastEcho = millis();
+  }
+}
+
+////////////////////////////////////////////////////////////
+//
+// [OBSTACLE] lecture de la distance
+//   renvoie la distance en cm,
+//   DIST_HORS_PORTEE si rien n'est détecté,
+//   -1 si le capteur ne répond plus (débranché, en panne)
+//
+////////////////////////////////////////////////////////////
+
+int getDistanceCm() {
+  unsigned long duree, derniere;
+  noInterrupts();                 // copie des variables partagées avec l'interruption
+  duree = urmPulseDuration;
+  derniere = urmLastEcho;
+  interrupts();
+
+  if ((derniere == 0) || (millis() - derniere > URM_TIMEOUT_MS))
+    return -1;                    // aucune mesure récente : capteur muet
+  unsigned long cm = duree / 50;  // 50 µs = 1 cm
+  if (cm > 250)
+    return DIST_HORS_PORTEE;      // mesure invalide (impulsion de 50 000 µs) : rien devant
+  return (int)cm;
+}
