@@ -6,7 +6,8 @@
 #
 # Missions :
 #   {"type": "huit"}
-#   {"type": "grille", "start": [x, y], "heading": "N", "goal": [x, y], "grid_size": [w, h]}   (grid_size optionnel)
+#   {"type": "grille", "start": [x, y], "heading": "N", "goal": [x, y],
+#    "grid_size": [w, h], "blocked_nodes": [[x, y]], "blocked_edges": [[[x1, y1], [x2, y2]]]}
 
 import threading
 import time

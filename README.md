@@ -78,7 +78,7 @@ Sans argument, le programme utilise `SERVER_IP` et `ROBOT_ID` de `raspberry/conf
 Dans `control.py`, saisir `m` pour envoyer une mission :
 
 - **Circuit en huit** : choisir `h`. Le robot suit la ligne et franchit les intersections en continuant tout droit lorsque cette branche est détectée.
-- **Grille** : choisir `g`, puis saisir les coordonnées de départ `x y`, le cap initial (`N`, `E`, `S` ou `W`) et les coordonnées de destination `x y`.
+- **Grille** : choisir `g`, saisir la taille (largeur et hauteur, par défaut `4 4`), les coordonnées de départ `x y`, le cap initial (`N`, `E`, `S` ou `W`) et les coordonnées de destination `x y`. Le contrôle propose ensuite d’ajouter des obstacles connus : cliquez sur un nœud pour bloquer toutes ses branches, ou sur un segment pour ne bloquer que celui-ci. Cliquez à nouveau pour retirer un obstacle, puis validez la sélection.
 - **Debug caméra** : choisir `d`. Le Raspberry Pi n’ouvre pas la liaison Arduino et n’envoie aucune commande moteur. Une fenêtre affiche côte à côte l’image annotée (ligne et branches détectées) et le masque traité, en analysant chaque image disponible comme dans la boucle de conduite. Le temps de capture et les durées du prétraitement, de détection de ligne et de détection d’intersection sont envoyés au terminal du serveur. Appuyez sur `q` dans la fenêtre pour fermer le mode debug, ou envoyez `s` depuis `control.py`.
 
 Les nœuds de la grille sont indexés à partir de zéro : `N` augmente `y` et `E` augmente `x`. La taille par défaut est `4 × 4` (`GRID_W` et `GRID_H` dans `raspberry/config.py`). Les coordonnées de départ et de destination doivent être dans la grille.

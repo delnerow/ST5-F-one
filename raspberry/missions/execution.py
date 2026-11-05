@@ -51,8 +51,8 @@ def _attendre_obstacle(drv, link):
     return False
     
 def _urgence(drv, link):
-     """Obstacle signalé par l'Arduino : le robot attend jusqu'à ATTENTE_OBSTACLE_S ;
-      s'il part, le robot reprend, sinon il fait demi-tour."""
+    """Obstacle signalé par l'Arduino : le robot attend jusqu'à ATTENTE_OBSTACLE_S ;
+    s'il part, le robot reprend, sinon il fait demi-tour."""
     drv.stop()
     print("ARRÊT (obstacle)")
     link.send_event("emergency_stop", state=drv.etat, cause="obstacle")
@@ -150,7 +150,9 @@ def _decide(grid, loc, branches, goal, route, route_index, route_revision):
 
 
 def run_grille(mission, drv, odo, link):
-    grid = GridMap(*mission.grid_size)
+    grid = GridMap(*mission.grid_size, blocked_edges=mission.blocked_edges)
+    for node in mission.blocked_nodes:
+        grid.block_intersection(node)
     loc = Localizer(grid, mission.start, mission.heading)
     goal = mission.goal
     link.send_event(
@@ -204,7 +206,7 @@ def run_grille(mission, drv, odo, link):
     while not link.stop_event.is_set():
         if drv.obstacle:
             if _urgence(drv, link) == "echec":
-                 _interrupt(drv, link, "grille")
+                _interrupt(drv, link, "grille")
                 return False
             odo.update(False)       # le temps passé à l'arrêt ne compte pas comme distance
             continue

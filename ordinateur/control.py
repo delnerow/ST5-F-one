@@ -16,6 +16,7 @@ import zmq
 server_ip = "192.168.137.1"
 verbose_mode = False
 key_to_exit_program = b'q'
+DEFAULT_GRID_SIZE = (4, 4)
 
 
 def main():
@@ -33,9 +34,11 @@ def main():
             cmd_char = input_str[0]
             if cmd_char == 'm':             # nouvelle mission
                 try:
-                    send_message(server_socket, {"cmd": "mission", "mission": ask_mission()})
-                except ValueError:
-                    print("Saisie invalide, mission non envoyée.")
+                    mission = ask_mission()
+                    if mission is not None:
+                        send_message(server_socket, {"cmd": "mission", "mission": mission})
+                except (ValueError, RuntimeError) as error:
+                    print(f"Mission non envoyée : {error}")
             elif cmd_char != 'q':
                 msg = {"cmd": "key", "key": cmd_char}       # add header indicating origin ?
                 send_message(server_socket, msg)
@@ -47,10 +50,63 @@ def ask_mission():
         return {"type": "huit"}
     if kind.startswith('d'):
         return {"type": "debug"}
+    grid_size_input = input(
+        f"Taille de la grille largeur hauteur [{DEFAULT_GRID_SIZE[0]} {DEFAULT_GRID_SIZE[1]}] : "
+    ).strip()
+    grid_size = (
+        DEFAULT_GRID_SIZE
+        if not grid_size_input
+        else tuple(int(value) for value in grid_size_input.split())
+    )
+    if len(grid_size) != 2 or any(value < 1 for value in grid_size):
+        raise ValueError("la taille doit contenir deux entiers positifs")
     sx, sy = map(int, input("Origine x y : ").split())
     heading = input("Cap de départ (N/E/S/W) : ").strip().upper()
     gx, gy = map(int, input("Destination x y : ").split())
-    return {"type": "grille", "start": [sx, sy], "heading": heading, "goal": [gx, gy]}
+    if heading not in ("N", "E", "S", "W"):
+        raise ValueError("cap initial invalide : utiliser N, E, S ou W")
+    for label, (x, y) in (("origine", (sx, sy)), ("destination", (gx, gy))):
+        if not (0 <= x < grid_size[0] and 0 <= y < grid_size[1]):
+            raise ValueError(f"{label} {(x, y)} hors de la grille {grid_size}")
+    mission = {
+        "type": "grille",
+        "start": [sx, sy],
+        "heading": heading,
+        "goal": [gx, gy],
+        "grid_size": list(grid_size),
+        "blocked_nodes": [],
+        "blocked_edges": [],
+    }
+    answer = input("Ajouter des obstacles connus ? (o/n, n par défaut) : ").strip().lower()
+    if answer in ("o", "oui", "y", "yes"):
+        obstacles = select_obstacles((sx, sy), (gx, gy), grid_size, heading)
+        if obstacles is None:
+            print("Sélection annulée.")
+            return None
+        mission.update(obstacles)
+    elif answer not in ("", "n", "non", "no"):
+        raise ValueError("répondre par oui ou non à la question sur les obstacles")
+    return mission
+
+
+def select_obstacles(start, goal, grid_size, heading):
+    import tkinter as tk
+
+    from obstacle_editor import ObstacleEditor
+
+    try:
+        root = tk.Tk()
+    except tk.TclError as error:
+        raise RuntimeError(f"impossible d’ouvrir l’éditeur de carte : {error}") from error
+    try:
+        root.withdraw()
+        editor = ObstacleEditor(root, start, goal, grid_size, heading)
+        root.wait_window(editor.window)
+        return editor.result
+    except tk.TclError as error:
+        raise RuntimeError(f"erreur dans l’éditeur de carte : {error}") from error
+    finally:
+        root.destroy()
 
 
 def connect_to(ip):
