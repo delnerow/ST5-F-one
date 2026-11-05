@@ -305,11 +305,11 @@ def run_huit(mission, drv, odo, link):
     link.send_event("mission_started", mission="huit")
     link.send_event("driver_state", state=drv.etat)
     drv.demarrer()
-    if link.urgence_event.is_set() or drv.obstacle:
-        if _urgence(drv, link) == "echec":
-            break
-        continue
     while not link.stop_event.is_set():
+        if link.urgence_event.is_set() or drv.obstacle:
+            if _urgence(drv, link) == "echec":
+                break
+            continue
         event = _step_and_report(drv, link)
         if event and event[0] == "INTERSECTION":
             branches = event[1]
