@@ -58,11 +58,11 @@ class ObstacleEditor:
                 for edge in sorted(self.blocked_edges, key=lambda item: tuple(sorted(item)))
             ],
         }
-        self.window.destroy()
+        self.window.quit()
 
     def _cancel(self):
         self.result = None
-        self.window.destroy()
+        self.window.quit()
 
     def _on_resize(self, _event):
         self._draw()
