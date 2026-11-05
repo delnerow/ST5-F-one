@@ -204,7 +204,7 @@ def run_grille(mission, drv, odo, link):
     while not link.stop_event.is_set():
         if drv.obstacle:
             if _urgence(drv, link) == "echec":
-                 _interrupt(drv, link, "grille")
+                _interrupt(drv, link, "grille")
                 return False
             odo.update(False)       # le temps passé à l'arrêt ne compte pas comme distance
             continue
