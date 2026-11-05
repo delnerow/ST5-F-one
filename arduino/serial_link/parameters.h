@@ -3,6 +3,7 @@
 
 #define SERIAL_BAUD 115200
 #define SERIAL_TIMEOUT 100
+#define SERIAL_WATCHDOG_TIMEOUT_MS 750
 
 /* full Bluno wiring */
 const int ServofrontPin = 26;

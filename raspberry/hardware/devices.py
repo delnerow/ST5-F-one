@@ -21,7 +21,7 @@ def open_camera():
     camera = Picamera2()
     config = camera.create_preview_configuration(
         {"size": (cfg.LARGEUR, cfg.HAUTEUR), "format": 'RGB888'},
-        transform=Transform(hflip=cfg.CAMERA_HFLIP, vflip=cfg.CAMERA_VFLIP))
+        transform=Transform(hflip=cfg.CAMERA_HFLIP, vflip=cfg.CAMERA_VFLIP), buffer_count=1)
     camera.configure(config)
     camera.start()
     return camera

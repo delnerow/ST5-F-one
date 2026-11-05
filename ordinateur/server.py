@@ -96,7 +96,20 @@ def process_msg(msg):
                     )
                 )
             elif update_type == "event":
-                print("[{}] événement: {}".format(msg["from"], update))
+                if update.get("event") == "debug_image_timing":
+                    print(
+                        "[{}] debug image: capture={:.2f} ms, prétraitement={:.2f} ms, "
+                        "ligne={:.2f} ms, intersection={:.2f} ms, traitement total={:.2f} ms".format(
+                            msg["from"],
+                            update.get("capture_ms", 0.0),
+                            update.get("preprocessing_ms", 0.0),
+                            update.get("line_detection_ms", 0.0),
+                            update.get("intersection_detection_ms", 0.0),
+                            update.get("processing_ms", 0.0),
+                        )
+                    )
+                else:
+                    print("[{}] événement: {}".format(msg["from"], update))
         reply = {"key": key}
         key = ''
 

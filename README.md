@@ -79,13 +79,15 @@ Dans `control.py`, saisir `m` pour envoyer une mission :
 
 - **Circuit en huit** : choisir `h`. Le robot suit la ligne et franchit les intersections en continuant tout droit lorsque cette branche est détectée.
 - **Grille** : choisir `g`, puis saisir les coordonnées de départ `x y`, le cap initial (`N`, `E`, `S` ou `W`) et les coordonnées de destination `x y`.
-- **Debug caméra** : choisir `d`. Le Raspberry Pi n’ouvre pas la liaison Arduino et n’envoie aucune commande moteur. Une fenêtre affiche côte à côte l’image annotée (ligne et branches détectées) et le masque traité, avec une nouvelle capture toutes les deux secondes. Appuyez sur `q` dans la fenêtre pour fermer le mode debug, ou envoyez `s` depuis `control.py`.
+- **Debug caméra** : choisir `d`. Le Raspberry Pi n’ouvre pas la liaison Arduino et n’envoie aucune commande moteur. Une fenêtre affiche côte à côte l’image annotée (ligne et branches détectées) et le masque traité, en analysant chaque image disponible comme dans la boucle de conduite. Le temps de capture et les durées du prétraitement, de détection de ligne et de détection d’intersection sont envoyés au terminal du serveur. Appuyez sur `q` dans la fenêtre pour fermer le mode debug, ou envoyez `s` depuis `control.py`.
 
 Les nœuds de la grille sont indexés à partir de zéro : `N` augmente `y` et `E` augmente `x`. La taille par défaut est `4 × 4` (`GRID_W` et `GRID_H` dans `raspberry/config.py`). Les coordonnées de départ et de destination doivent être dans la grille.
 
 Pendant une mission, saisir `r` dans `control.py` pour abandonner la mission : le driver arrête les moteurs, passe en état `ARRET` et ne reprend plus de capture caméra; le programme libère ensuite la caméra et l’Arduino. `q` quitte l’interface de commande sans remplacer l’arrêt d’urgence matériel. Gardez toujours le robot sous surveillance et prévoyez un moyen d’arrêt physique indépendant.
 
 Pendant une mission sur grille, le Raspberry Pi transmet au serveur les estimations de position (coordonnées de grille, nœud candidat, cap, distance et confiance) ainsi que les transitions d’état du driver et les événements de mission/intersection. Les messages sont affichés dans le terminal du serveur. Ils sont transportés avec les requêtes périodiques de touches afin que le thread propriétaire de la socket ZeroMQ reste le seul à l’utiliser.
+
+La carte Arduino ne transmet pas de données spontanément : elle répond aux requêtes du Raspberry Pi. Toute activité série entrante (commande moteur ou lecture de capteurs) renouvelle le watchdog. Si aucune activité n’est reçue pendant 750 ms alors qu’une consigne moteur est non nulle, l’Arduino arrête et verrouille les moteurs; il ignore ensuite les commandes de mouvement jusqu’à une nouvelle connexion explicite. Les attentes d’acquittement série du Raspberry Pi expirent après 0,5 s et lèvent `TimeoutError`. Ce watchdog doit être validé sur banc, roues levées, avant tout essai sur piste; il ne remplace pas un arrêt d’urgence matériel.
 
 ## Calibrage et limites
 

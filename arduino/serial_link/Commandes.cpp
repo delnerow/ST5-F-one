@@ -21,6 +21,7 @@ extern MyServo frontservo;
 extern char feedback ;
 extern char commode ;
 extern bool ConnOn ;
+extern bool watchdogTripped ;
 extern int seuilObst ;          // [OBSTACLE] seuil d'arrêt en cm (0 = désactivé)
 extern int getDistanceCm() ;    // [OBSTACLE] défini dans serial_link.ino
 
@@ -46,11 +47,13 @@ void CONNECT_code() {
   feedback=c-'0' ;
   commode= GetChar(0);
   if (commode>0) commode-='0'; else commode=0 ;
-  if (ConnOn==false)     // on n'est pas encore connecté
-    {
-    ConnOn = true ;
-    init_arduino() ;
-    }
+  if (ConnOn==false || watchdogTripped)
+    { 
+      ConnOn = true ;
+      watchdogTripped = false;
+      init_arduino() ;
+      TaskOn(1);
+  }
   RetAcquit(F("OK Arduino connecte version 1.0 en mode "),commode);
 }
 
@@ -88,6 +91,10 @@ void SINGLEMOTOR_code() {
   { nivM=GetInt(0) ;              // recupere la valeur de la commande
     GetInt(0) ;
     GetLong(0);
+    if (watchdogTripped) {
+      Serial.println(F("WD watchdog: reconnect required"));
+      return;
+    }
     //mx->setvalue(nivM) ;
     setpoint[m-'0'-1] = nivM;
 
@@ -115,6 +122,11 @@ void QUADMOTOR_code() {
   nivM2=GetInt(nivM1) ; // on lit la valeur du deuxième moteur
   nivM3=GetInt(nivM2) ; // on lit la valeur du troisième moteur
   nivM4=GetInt(nivM3) ; // on lit la valeur du quatrième moteur
+
+  if (watchdogTripped) {
+    Serial.println(F("WD watchdog: reconnect required"));
+    return;
+  }
 
   // on envoie la commande aux 4 moteurs
   setpoint[0] = nivM1;

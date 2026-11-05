@@ -29,7 +29,7 @@ def main():
             from missions.debug import run_debug
 
             camera = open_camera()
-            run_debug(camera, link.stop_event)
+            run_debug(camera, link.stop_event, link)
         else:
             from control.driver import Driver
             from hardware.devices import open_arduino
@@ -48,14 +48,18 @@ def main():
     except KeyboardInterrupt:
         print("Arrêt demandé")
     finally:
-        if arduino is not None:
+        try:
+            if arduino is not None:
+                try:
+                    arduino.Stop()
+                finally:
+                    arduino.disconnect()
+        finally:
             try:
-                arduino.Stop()
+                if camera is not None:
+                    camera.stop()
             finally:
-                arduino.disconnect()
-        if camera is not None:
-            camera.stop()
-        link.close()
+                link.close()
 
 
 if __name__ == "__main__":

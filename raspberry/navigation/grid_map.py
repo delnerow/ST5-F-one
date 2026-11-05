@@ -99,6 +99,17 @@ class GridMap:
         if edge in self.physical_edges and edge not in self.blocked:
             self.blocked.add(edge)
             self._revision += 1
+            return True
+        return False
+
+    def block_intersection(self, node):
+        """Bloque tous les segments connectés au nœud, sans changer son type."""
+        blocked_edges = []
+        for heading in HEADINGS:
+            edge = frozenset((node, step(node, heading)))
+            if self.block(node, heading):
+                blocked_edges.append(edge)
+        return tuple(blocked_edges)
 
     def add_branch(self, node, heading):
         """Ajoute un segment physique découvert, et invalide les plans existants."""
