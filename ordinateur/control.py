@@ -104,9 +104,8 @@ def select_obstacles(start, goal, grid_size, heading):
     except tk.TclError as error:
         raise RuntimeError(f"impossible d’ouvrir l’éditeur de carte : {error}") from error
     try:
-        root.withdraw()
         editor = ObstacleEditor(root, start, goal, grid_size, heading)
-        root.wait_window(editor.window)
+        root.mainloop()
         return editor.result
     except tk.TclError as error:
         raise RuntimeError(f"erreur dans l’éditeur de carte : {error}") from error

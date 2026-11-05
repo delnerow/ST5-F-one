@@ -15,7 +15,7 @@ class ObstacleEditor:
         self.blocked_edges = set()
         self.result = None
 
-        self.window = tk.Toplevel(root)
+        self.window = root
         self.window.title("Select known grid obstacles")
         self.window.protocol("WM_DELETE_WINDOW", self._cancel)
         frame = tk.Frame(self.window, padx=12, pady=12)
@@ -48,8 +48,6 @@ class ObstacleEditor:
             side=tk.RIGHT, padx=(0, 8)
         )
 
-        self.window.transient(root)
-        self.window.grab_set()
         self._draw()
 
     def _submit(self):
