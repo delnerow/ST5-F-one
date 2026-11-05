@@ -139,6 +139,17 @@ def _remaining_route_nodes(route, route_index):
     return [node for node, _ in route[route_index:]]
 
 
+def _goal_arrival_verified(candidate_node, goal, fix, route, route_index):
+    next_index = route_index + 1
+    return (
+        candidate_node == goal
+        and fix.matched
+        and fix.skipped == 0
+        and next_index < len(route)
+        and route[next_index][0] == goal
+    )
+
+
 def _decide(grid, loc, branches, goal, route, route_index, route_revision):
     """Suit le plan courant; recalcule seulement si la carte change ou si le plan diverge."""
     for relative_heading in ('gauche', 'devant', 'droite'):
@@ -188,6 +199,11 @@ def run_grille(mission, drv, odo, link):
         grid.block_intersection(node)
     loc = Localizer(grid, mission.start, mission.heading)
     goal = mission.goal
+    print(
+        f"Mission grille reçue : départ={mission.start}, cap={mission.heading}, "
+        f"destination={goal}, grille={mission.grid_size}.",
+        flush=True,
+    )
     link.send_event(
         "mission_started",
         mission="grille",
@@ -233,7 +249,13 @@ def run_grille(mission, drv, odo, link):
     # 1. Orientation initiale : pivoter si le premier mouvement n'est pas "devant"
     first_h = route[0][1]
     rel = relative(loc.heading, first_h)
+    print(
+        f"Orientation initiale : cap déclaré={loc.heading}, "
+        f"premier segment planifié={first_h} ({rel}).",
+        flush=True,
+    )
     if rel != 'devant':
+        print(f"Rotation initiale demandée : {rel}.", flush=True)
         if rel == 'derriere':
             previous_state = drv.etat
             drv.turn_in_place('droite', 2)
@@ -246,10 +268,18 @@ def run_grille(mission, drv, odo, link):
             return False
         loc.heading = first_h
         link.send_event("heading_changed", heading=loc.heading)
+    else:
+        print(
+            "Aucune rotation initiale : le programme suppose que le robot fait déjà "
+            f"face à {loc.heading}.",
+            flush=True,
+        )
     odo.reset()
 
     # 2. Boucle principale
     last_log = 0.0
+    straight_intersection_pending = False
+    goal_intersection_verified = False
     bloc_en_attente = None          # route à bloquer après un demi-tour (appliqué au prochain centre)
 
     def report_fixed_obstacle():
@@ -270,9 +300,23 @@ def run_grille(mission, drv, odo, link):
 
     while not link.stop_event.is_set():
         if drv.obstacle:
-            if _urgence(drv, link, report_fixed_obstacle) == "echec":
+            obstacle_result = _urgence(drv, link, report_fixed_obstacle)
+            if obstacle_result == "echec":
                 _interrupt(drv, link, "grille")
                 return False
+            if obstacle_result == "demi_tour":
+                loc.begin_return_to_confirmed_node(odo.distance)
+                odo.reset()
+                link.send_event(
+                    "heading_changed",
+                    heading=loc.heading,
+                    reason="obstacle_uturn",
+                )
+                print(
+                    f"Après demi-tour, cap corrigé à {loc.heading}; "
+                    f"retour attendu au nœud confirmé {loc.node}.",
+                    flush=True,
+                )
             odo.update(False)       # le temps passé à l'arrêt ne compte pas comme distance
             continue
         event = _step_and_report(drv, link)
@@ -300,7 +344,14 @@ def run_grille(mission, drv, odo, link):
         kind, data = event
 
         if kind == "INTERSECTION":
+            returning_to_node = loc.returning_to_node
             fix = loc.seen_intersection(data, odo.distance)
+            if returning_to_node:
+                odo.reset()
+                print(
+                    f"Intersection de retour recalée sur le nœud confirmé {loc.node}.",
+                    flush=True,
+                )
             link.send_event(
                 "INTERSECTION",
                 node=fix.node,
@@ -312,7 +363,37 @@ def run_grille(mission, drv, odo, link):
             print(f"Intersection {fix.node} [{flag}] vu={sorted(fix.observed)} prévu={sorted(fix.expected)}"
                   f"  (cases sautées : {fix.skipped})")
             if loc.candidate_node == goal:
-                print("Destination atteinte.")
+                goal_intersection_verified = _goal_arrival_verified(
+                    loc.candidate_node,
+                    goal,
+                    fix,
+                    route,
+                    route_index,
+                )
+                if goal_intersection_verified:
+                    print(f"Destination {goal} confirmée sur l'itinéraire.", flush=True)
+                else:
+                    expected_node = (
+                        route[route_index + 1][0]
+                        if route_index + 1 < len(route)
+                        else None
+                    )
+                    print(
+                        f"Arrivée non confirmée : localisation={loc.candidate_node}, "
+                        f"prochaine étape prévue={expected_node}, "
+                        f"intersection correspondante={fix.matched}, "
+                        f"intersections sautées={fix.skipped}. Arrêt de sécurité.",
+                        flush=True,
+                    )
+                    link.send_event(
+                        "localization_mismatch",
+                        candidate_node=loc.candidate_node,
+                        goal=goal,
+                        expected_node=expected_node,
+                        matched=fix.matched,
+                        skipped=fix.skipped,
+                    )
+                straight_intersection_pending = False
                 _choose_and_report(drv, link, 'stop')       # avance au centre puis s'arrête
                 continue
             try:
@@ -323,9 +404,17 @@ def run_grille(mission, drv, odo, link):
                 choix = None
             if choix is None:
                 print("Aucun itinéraire possible depuis ici : arrêt.")
+                straight_intersection_pending = False
                 _choose_and_report(drv, link, 'stop')
                 continue
+            straight_intersection_pending = choix == 'devant'
             print(f"  -> {choix}")
+            if straight_intersection_pending:
+                print(
+                    f"  intersection {loc.candidate_node} entre deux branches droites : "
+                    f"traversée à vitesse lente ({cfg.VITESSE_LENTE} PWM), sans arrêt.",
+                    flush=True,
+                )
             loc.on_turn(choix)
             link.send_event("direction_chosen", direction=choix, heading=loc.heading)
             _choose_and_report(drv, link, choix)
@@ -350,6 +439,17 @@ def run_grille(mission, drv, odo, link):
                 heading=loc.heading,
                 confidence=loc.confidence,
             )
+            if straight_intersection_pending:
+                print(
+                    f"Intersection droite dépassée ; position confirmée en {loc.node}.",
+                    flush=True,
+                )
+                link.send_event(
+                    "straight_intersection_passed",
+                    node=loc.node,
+                    speed=cfg.VITESSE_LENTE,
+                )
+                straight_intersection_pending = False
 
         elif kind == "TURN_DONE":
             odo.reset()                                     # centre du carrefour : distance = 0
@@ -357,12 +457,21 @@ def run_grille(mission, drv, odo, link):
 
         elif kind == "STOPPED":
             loc.centered_on_intersection()
-            completed = loc.node == goal
+            completed = loc.node == goal and goal_intersection_verified
+            if completed:
+                print(f"Mission accomplie : nœud final={loc.node}, destination={goal}.", flush=True)
+            else:
+                print(
+                    f"Mission arrêtée sans confirmation du but : nœud={loc.node}, "
+                    f"destination={goal}.",
+                    flush=True,
+                )
             link.send_event(
                 "mission_completed" if completed else "mission_stopped",
                 mission="grille",
                 node=loc.node,
                 goal=goal,
+                reason="goal_confirmed" if completed else "goal_unverified",
             )
             return completed
 

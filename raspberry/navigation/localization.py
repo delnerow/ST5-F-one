@@ -34,11 +34,18 @@ class Localizer:
         self._pending_node = None
         self._pending_confidence = None
         self._pending_origin = None
+        self._returning_to_node = False
+        self._return_heading = None
+        self._return_distance = 0.0
 
     @property
     def candidate_node(self):
         """Nœud estimé à l'intersection détectée, ou dernier nœud confirmé."""
         return self.node if self._pending_node is None else self._pending_node
+
+    @property
+    def returning_to_node(self):
+        return self._returning_to_node
 
     # -- utilitaires ----------------------------------------------------------
     def _max_cells(self, node=None, heading=None):
@@ -57,6 +64,11 @@ class Localizer:
 
     # -- position continue (pour AFFICHAGE / suivi) ---------------------------------
     def estimate(self, dist_m):
+        if self._returning_to_node:
+            remaining_m = max(0.0, self._return_distance - dist_m)
+            cells = remaining_m / cfg.CELL_M
+            dx, dy = DELTA[self._return_heading]
+            return (self.node[0] + dx * cells, self.node[1] + dy * cells)
         if self._pending_origin is None:
             node, heading = self.node, self.heading
         else:
@@ -74,6 +86,17 @@ class Localizer:
             raise RuntimeError("l'intersection précédente n'a pas encore été centrée")
 
         observed = set(observed)
+        if self._returning_to_node:
+            expected = self._expected(0)
+            matched = expected == observed
+            self._pending_node = self.node
+            self._pending_confidence = 1.0 if matched else 0.5
+            self._pending_origin = (self.node, self.heading)
+            self._returning_to_node = False
+            self._return_heading = None
+            self._return_distance = 0.0
+            return Fix(self.node, 0, matched, expected, observed)
+
         k_est = (dist_m + cfg.APPROACH_OFFSET_M) / cfg.CELL_M
         reach = self._max_cells()
 
@@ -105,7 +128,16 @@ class Localizer:
         self._pending_node = None
         self._pending_confidence = None
         self._pending_origin = None
+        self._return_heading = None
+        self._return_distance = 0.0
         return self.node
+
+    def begin_return_to_confirmed_node(self, distance_m):
+        """Re-anchor after a U-turn between intersections, on the return to the last node."""
+        self._return_heading = self.heading
+        self._return_distance = max(0.0, distance_m)
+        self.heading = heading_after(heading_after(self.heading, 'gauche'), 'gauche')
+        self._returning_to_node = True
 
     def on_turn(self, rel):
         """À appeler quand le robot a choisi 'gauche', 'devant' ou 'droite' à un nœud."""

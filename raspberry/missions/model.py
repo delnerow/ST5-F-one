@@ -57,12 +57,12 @@ class Mission:
                 initial_route = _parse_initial_route(d["initial_route"], start, goal, size)
                 blocked_node_set = set(blocked_nodes)
                 blocked_edge_set = {frozenset(edge) for edge in blocked_edges}
-                for (node, heading), (next_node, _) in zip(initial_route, initial_route[1:]):
+                for (node, route_heading), (next_node, _) in zip(initial_route, initial_route[1:]):
                     if node in blocked_node_set or next_node in blocked_node_set:
                         raise ValueError(f"itinéraire initial traversant un nœud bloqué : {node} -> {next_node}")
                     if frozenset((node, next_node)) in blocked_edge_set:
                         raise ValueError(f"itinéraire initial traversant un segment bloqué : {node} -> {next_node}")
-                    if heading is None or step(node, heading) != next_node:
+                    if route_heading is None or step(node, route_heading) != next_node:
                         raise ValueError(f"itinéraire initial invalide entre {node} et {next_node}")
 
             return cls(
