@@ -21,16 +21,38 @@ def _step_and_report(drv, link):
     previous_state = drv.etat
     event = drv.step()
     _report_state_transition(drv, link, previous_state)
+    _report_driver_event(event)
     return event
 
 
 def _report_state_transition(drv, link, previous_state):
     if drv.etat != previous_state:
+        print(f"État du driver : {previous_state} -> {drv.etat}", flush=True)
         link.send_event(
             "driver_state",
             previous_state=previous_state,
             state=drv.etat,
         )
+
+
+def _report_driver_event(event):
+    if event is None:
+        return
+    kind, data = event
+    if kind == "INTERSECTION":
+        print(f"Intersection détectée, branches visibles : {data}", flush=True)
+    elif kind == "CENTERED":
+        print("Robot centré sur l'intersection.", flush=True)
+    elif kind == "TURN_DONE":
+        print("Rotation terminée, ligne retrouvée.", flush=True)
+    elif kind == "UTURN_DONE":
+        print("Demi-tour terminé, ligne retrouvée.", flush=True)
+    elif kind == "UTURN_FAILED":
+        print("Demi-tour échoué : ligne non retrouvée.", flush=True)
+    elif kind == "STOPPED":
+        print("Arrêt au centre de l'intersection.", flush=True)
+    elif kind == "ABORTED":
+        print("Boucle du driver interrompue.", flush=True)
 
 
 def _choose_and_report(drv, link, choice):
@@ -85,18 +107,18 @@ def _urgence(drv, link):
         ev = _step_and_report(drv, link)
         if ev and ev[0] == "UTURN_DONE":
             drv.obstacle = False      # les "OB" reçus pendant la rotation ne comptent pas
-            print("  demi-tour terminé, reprise")
             link.send_event("uturn_completed")
             return "demi_tour"
         if ev and ev[0] == "UTURN_FAILED":
-            print("  demi-tour impossible : ligne non retrouvée")
             link.send_event("uturn_failed")
             return "echec"
     return "echec"
 
 def _interrupt(drv, link, mission):
     """Arrête les moteurs et signale l'interruption avec sa cause."""
+    previous_state = drv.etat
     drv.stop()
+    _report_state_transition(drv, link, previous_state)
     cause = drv.cause_arret or "operateur"     # 'watchdog', 'obstacle', 'muet' ou 'operateur'
     print(f"Mission interrompue ({cause}).")
     link.send_event("mission_interrupted", mission=mission, cause=cause)
@@ -104,6 +126,15 @@ def _interrupt(drv, link, mission):
 
 def _plan_from(grid, loc, goal):
     return plan_path(grid, loc.candidate_node, loc.heading, goal, allow_uturn=False)
+
+
+def _next_target_node(route, route_index):
+    next_index = route_index + 1
+    return route[next_index][0] if next_index < len(route) else None
+
+
+def _remaining_route_nodes(route, route_index):
+    return [node for node, _ in route[route_index:]]
 
 
 def _decide(grid, loc, branches, goal, route, route_index, route_revision):
@@ -164,15 +195,17 @@ def run_grille(mission, drv, odo, link):
         grid_size=mission.grid_size,
     )
     link.send_event("driver_state", state=drv.etat)
-    link.send_position(
-        x=float(loc.node[0]),
-        y=float(loc.node[1]),
-        node=loc.node,
-        heading=loc.heading,
-        distance_m=0.0,
-        confidence=loc.confidence,
-    )
+    print(f"État initial du driver : {drv.etat}", flush=True)
     if loc.node == goal:
+        link.send_position(
+            x=float(loc.node[0]),
+            y=float(loc.node[1]),
+            node=loc.node,
+            target_node=None,
+            heading=loc.heading,
+            distance_m=0.0,
+            confidence=loc.confidence,
+        )
         print("Déjà à destination.")
         link.send_event("mission_completed", mission="grille", result="already_at_goal")
         return True
@@ -181,6 +214,16 @@ def run_grille(mission, drv, odo, link):
     route_index = 0
     route_revision = grid.revision
     print("Itinéraire :", " -> ".join(f"{n}" for n, _ in route))
+    link.send_position(
+        x=float(loc.node[0]),
+        y=float(loc.node[1]),
+        node=loc.node,
+        target_node=_next_target_node(route, route_index),
+        planned_path=_remaining_route_nodes(route, route_index),
+        heading=loc.heading,
+        distance_m=0.0,
+        confidence=loc.confidence,
+    )
 
     # 1. Orientation initiale : pivoter si le premier mouvement n'est pas "devant"
     first_h = route[0][1]
@@ -220,6 +263,8 @@ def run_grille(mission, drv, odo, link):
             y=y,
             node=loc.node,
             candidate_node=loc.candidate_node,
+            target_node=_next_target_node(route, route_index),
+            planned_path=_remaining_route_nodes(route, route_index),
             heading=loc.heading,
             distance_m=odo.distance,
             confidence=loc.confidence,
@@ -271,6 +316,8 @@ def run_grille(mission, drv, odo, link):
                 y=float(loc.node[1]),
                 node=loc.node,
                 candidate_node=loc.candidate_node,
+                target_node=_next_target_node(route, route_index),
+                planned_path=_remaining_route_nodes(route, route_index),
                 heading=loc.heading,
                 distance_m=0.0,
                 confidence=loc.confidence,
@@ -306,6 +353,7 @@ def run_huit(mission, drv, odo, link):
     drv.detecter_intersections = False      # sur le 8 : pas de croisement à gérer, suivi de ligne pur
     link.send_event("mission_started", mission="huit")
     link.send_event("driver_state", state=drv.etat)
+    print(f"État initial du driver : {drv.etat}", flush=True)
     drv.demarrer()
     while not link.stop_event.is_set():
         if drv.obstacle:
