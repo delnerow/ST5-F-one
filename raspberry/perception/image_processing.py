@@ -28,7 +28,7 @@ def traitement(image):
     # AJOUT : seuil relatif. Le sol occupe la majorité de l'image, donc la médiane donne
     # son niveau de gris ; la ligne doit être nettement plus claire que lui.
     # Le seuil s'adapte ainsi tout seul à l'éclairage (sol clair ou sombre).
-    seuil = np.median(blur) + ECART
+    seuil = np.percentile(blur,10) + ECART
     ret, thresh = cv2.threshold(blur, seuil, 255, cv2.THRESH_BINARY)
 
     # Remove noise with morphological processing
