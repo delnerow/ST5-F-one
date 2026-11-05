@@ -63,7 +63,12 @@ class Driver:
         try:
             sendCmdi(self.car.serialport, b'C', d, g, d, g)
         except ArduinoStop as e:
-            self._arret_arduino(e.cause)
+            if e.cause == 'obstacle':
+                    # L'Arduino bloque la marche avant mais accepte la rotation sur place :
+                    # pas d'arrêt définitif, la mission gère (attente puis demi-tour)
+                self.obstacle = True
+            else:
+                self._arret_arduino(e.cause)
 
     def _arret_arduino(self, cause):
         """Arrêt de sécurité signalé par l'Arduino : verrouille ARRET et prévient la mission."""
