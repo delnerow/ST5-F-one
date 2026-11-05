@@ -223,4 +223,22 @@ class Driver:
                         self.integrale, self.erreur_prec = 0.0, None
                         self.etat = "SUIVI"
                         return ("TURN_DONE", None)
+            elif self.etat == "DEMI_TOUR":
+                if self.sens == 'gauche':
+                    self.moteurs(-cfg.VITESSE_ROTATION, cfg.VITESSE_ROTATION)
+                else:
+                    self.moteurs(cfg.VITESSE_ROTATION, -cfg.VITESSE_ROTATION)
+                    erreur = None if ligne is None else (ligne[0] - cfg.LARGEUR / 2) / (cfg.LARGEUR / 2)
+                if not self.ligne_quittee:                  # 1. on quitte la ligne de départ
+                    if erreur is None or abs(erreur) > cfg.ERREUR_LIGNE_QUITTEE:
+                        self.ligne_quittee = True
+                elif erreur is not None and abs(erreur) < cfg.ERREUR_ALIGNEE:   # 2. on la retrouve centrée
+                    self.etat = "SUIVI"
+                    self.votes = {d: 0 for d in DIRECTIONS}
+                    self.nb_images = self.sans_inter = 0
+                    return ("UTURN_DONE", None)
+                if t - self.debut > cfg.TEMPS_MAX_DEMI_TOUR:
+                    self.stop()
+                    self.etat = "ARRET"
+                    return ("UTURN_FAILED", None)
         return None
