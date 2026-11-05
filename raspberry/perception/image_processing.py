@@ -82,7 +82,7 @@ def find_intersection(closed_mask, h):
     largeur_ligne = np.median(largeur_interieur)
 
     # 4. Rangées transversales : blanc continu depuis un bord, nettement plus long que la ligne.
-    #    Plus besoin de 2,5 fois la ligne : une branche courte (robot décentré, L) suffit.
+
     plus_long = np.maximum(blanc_depuis_gauche, blanc_depuis_droite)
     rangees = np.where(plus_long > RATIO * largeur_ligne)[0]
     if len(rangees) < RANGEES_MIN:
@@ -97,7 +97,7 @@ def find_intersection(closed_mask, h):
     cx = M['m10'] / M['m00']
 
     # 6. Branches à gauche et à droite : la transversale atteint-elle le bord de l'image ?
-    #    CORRIGÉ : une vraie branche fait 80 cm à 1 m, elle sort du champ de la caméra ;
+  
     #    un bout de ruban qui dépasse de 2-3 cm, non. On prend toutes les rangées de la
     #    transversale (+/- 3) pour bien voir une ligne posée de travers.
     bande = closed_mask[max(0, y0 + rangees.min() - 3):y0 + rangees.max() + 4, :]
@@ -106,8 +106,7 @@ def find_intersection(closed_mask, h):
     droite = colonnes_blanches.max() > (1 - BORD) * w
 
     # 7. Branche devant : la ligne continue-t-elle au-dessus de la transversale ?
-    #    CORRIGÉ : on regarde nettement plus haut (15 à 30 % de la hauteur au-dessus),
-    #    sinon un bout de ruban qui dépasse est pris pour une branche.
+  
     haut = max(0, y_trans - int(0.30 * h))
     bas = max(0, y_trans - int(0.15 * h))
     x_min = int(max(0, cx - 3 * largeur_ligne))
@@ -115,7 +114,7 @@ def find_intersection(closed_mask, h):
     au_dessus = closed_mask[haut:bas, x_min:x_max]
     devant = au_dessus.shape[0] > 0 and np.mean(au_dessus.max(axis=1) > 0) > 0.5
 
-    # CORRIGÉ : une transversale sans aucune branche confirmée n'est pas exploitable
+   
     if not (gauche or droite or devant):
         return None
 
