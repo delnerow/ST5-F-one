@@ -51,8 +51,8 @@ def _attendre_obstacle(drv, link):
     return False
     
 def _urgence(drv, link):
-     """Obstacle signalé par l'Arduino : le robot attend jusqu'à ATTENTE_OBSTACLE_S ;
-      s'il part, le robot reprend, sinon il fait demi-tour."""
+    """Obstacle signalé par l'Arduino : le robot attend jusqu'à ATTENTE_OBSTACLE_S ;
+    s'il part, le robot reprend, sinon il fait demi-tour."""
     drv.stop()
     print("ARRÊT (obstacle)")
     link.send_event("emergency_stop", state=drv.etat, cause="obstacle")
