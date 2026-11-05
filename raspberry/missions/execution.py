@@ -51,7 +51,8 @@ def _attendre_obstacle(drv, link):
     return False
     
 def _urgence(drv, link):
-    """Renvoie "reprise", "demi_tour", "manoeuvre" ou "echec"."""
+     """Obstacle signalé par l'Arduino : le robot attend jusqu'à ATTENTE_OBSTACLE_S ;
+      s'il part, le robot reprend, sinon il fait demi-tour."""
     drv.stop()
     print("ARRÊT (obstacle)")
     link.send_event("emergency_stop", state=drv.etat, cause="obstacle")
@@ -68,7 +69,7 @@ def _urgence(drv, link):
     print("  obstacle toujours là")
     drv.obstacle_confirme = True
     if drv.etat not in ("SUIVI", "APPROCHE"):
-        if cause == "obstacle" and drv.etat == "AVANCE":
+        if drv.etat == "AVANCE":
             drv.debut = -1e9          # l'avance vers le centre du carrefour se termine tout de suite
             print("  au carrefour : l'avance vers le centre s'arrête ici")
         else:
@@ -201,6 +202,12 @@ def run_grille(mission, drv, odo, link):
     last_log = 0.0
     bloc_en_attente = None          # route à bloquer après un demi-tour (appliqué au prochain centre)
     while not link.stop_event.is_set():
+        if drv.obstacle:
+            if _urgence(drv, link) == "echec":
+                 _interrupt(drv, link, "grille")
+                return False
+            odo.update(False)       # le temps passé à l'arrêt ne compte pas comme distance
+            continue
         event = _step_and_report(drv, link)
         odo.update(drv.straight)
 
@@ -298,6 +305,10 @@ def run_huit(mission, drv, odo, link):
     link.send_event("mission_started", mission="huit")
     link.send_event("driver_state", state=drv.etat)
     drv.demarrer()
+    if link.urgence_event.is_set() or drv.obstacle:
+        if _urgence(drv, link) == "echec":
+            break
+        continue
     while not link.stop_event.is_set():
         event = _step_and_report(drv, link)
         if event and event[0] == "INTERSECTION":
