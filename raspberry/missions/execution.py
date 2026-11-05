@@ -202,44 +202,11 @@ def run_grille(mission, drv, odo, link):
     last_log = 0.0
     bloc_en_attente = None          # route à bloquer après un demi-tour (appliqué au prochain centre)
     while not link.stop_event.is_set():
-            if link.urgence_event.is_set() or drv.obstacle:
-                d = odo.distance
-                resultat = _urgence(drv, link)
-                if resultat == "echec":
-                    _interrupt(drv, link, "grille")
-                    return False
-            if resultat == "demi_tour" and d < cfg.DISTANCE_PROCHE_INTERSECTION:
-                # Obstacle juste après le carrefour A : en tournant vers la droite, le robot
-                # s'arrête sur la PREMIÈRE branche de A qu'il voit, pas forcément celle d'où il vient.
-                a, cap = loc.node, loc.heading
-                arriere = HEADINGS[(HEADINGS.index(cap) + 2) % 4]
-                branches_a = grid.branches(a)
-                nouveau = next((h for h in (right_of(cap), arriere, left_of(cap)) if h in branches_a), arriere)
-                if cfg.BLOQUER_SEGMENT_URGENCE:
-                    grid.block(a, cap)
-                    link.send_event("segment_blocked", node=a, heading=cap)
-                loc.heading = nouveau
-                odo.reset()
-                print(f"  repère : au carrefour {a}, cap {loc.heading}")
-                link.send_event("heading_changed", heading=loc.heading)
-            elif resultat == "demi_tour":
-                # Le robot était entre A (quitté depuis d m) et B. Il repart vers A :
-                # on se repère depuis B, à CELL_M - d.
-                a, cap = loc.node, loc.heading
-                b = step(a, cap)
-                if cfg.BLOQUER_SEGMENT_URGENCE:
-                    bloc_en_attente = (a, cap)   # bloquée seulement une fois sorti du segment
-                if grid.in_bounds(b):
-                    loc.node = b
-                loc.heading = HEADINGS[(HEADINGS.index(cap) + 2) % 4]
-                odo.reset()
-                odo.distance = max(0.0, cfg.CELL_M - d)
-                print(f"  repère : depuis {loc.node}, cap {loc.heading}, {odo.distance:.2f} m parcourus")
-                link.send_event("heading_changed", heading=loc.heading)
-            elif resultat == "manoeuvre":
-                odo.reset()
-            else:                       # reprise : la distance continue, sans compter l'arrêt
-                odo.update(False)
+        if drv.obstacle:
+            if _urgence(drv, link) == "echec":
+                 _interrupt(drv, link, "grille")
+                return False
+            odo.update(False)       # le temps passé à l'arrêt ne compte pas comme distance
             continue
         event = _step_and_report(drv, link)
         odo.update(drv.straight)
