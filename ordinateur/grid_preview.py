@@ -80,6 +80,9 @@ class GridPreview:
                     continue
         else:
             self.planned_path = []
+        self.planned_path = self._stop_path_at_obstacle(self.planned_path)
+        if self.target not in self.planned_path:
+            self.target = None
         candidate = update.get("candidate_node", update.get("node"))
         self.status.config(
             text=(
@@ -111,6 +114,9 @@ class GridPreview:
             if abs(first[0] - second[0]) + abs(first[1] - second[1]) != 1:
                 return
             self.fixed_obstacles.add(tuple(sorted((first, second))))
+            self.planned_path = self._stop_path_at_obstacle(self.planned_path)
+            if self.target not in self.planned_path:
+                self.target = None
             self.status.config(text=f"Fixed obstacle detected by Arduino: {first} -> {second}")
             self._draw()
             return
@@ -173,6 +179,12 @@ class GridPreview:
 
     def _on_resize(self, _event):
         self._draw()
+
+    def _stop_path_at_obstacle(self, path):
+        for index, (first, second) in enumerate(zip(path, path[1:])):
+            if tuple(sorted((first, second))) in self.fixed_obstacles:
+                return path[: index + 1]
+        return path
 
     def _draw(self):
         if self.width is None:
