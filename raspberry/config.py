@@ -2,7 +2,7 @@
 # Les valeurs marquées (À CALIBRER) doivent être mesurées sur la vraie piste.
 
 # ---------------------------------------------------------------- réseau
-SERVER_IP = "192.168.0.101"      # surchargé par argv[1]
+SERVER_IP = "192.168.137.1"      # surchargé par argv[1]
 ROBOT_ID = "bot001"              # surchargé par argv[2]
 SERVER_PORT = 5005
 REQUEST_TIMEOUT_MS = 2000        # pas de réponse du serveur -> on recrée la socket
