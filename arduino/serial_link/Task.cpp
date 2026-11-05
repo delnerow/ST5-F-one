@@ -19,8 +19,15 @@ extern int seuilObst;          // [OBSTACLE] seuil d'arrêt en cm (0 = protectio
 extern int getDistanceCm();    // [OBSTACLE] défini dans serial_link.ino
 
 int value[4] = {0,0,0,0};  // 'signed PWM' values between -255 and 255
-int setpoint[4] = {0,0,0,0}; // PWM setpoints between -255 and 255
-unsigned char deltaMax = 10;  // maximum gap between 2 successive values
+int setpoint[4] = {0,0,0,0}; // consignes entre -255 et 255 (vitesse si BOUCLE_FERMEE, PWM sinon)
+unsigned char deltaMax = 20;  // pente max : de la référence de vitesse (PI) ou de la PWM (boucle ouverte)
+
+// [PI] état de la régulation de vitesse (indices : 0 FR, 1 FL, 2 RR, 3 RL)
+static float ref[4]    = {0,0,0,0};   // référence rampée, en unités de consigne
+static float integ[4]  = {0,0,0,0};   // terme intégral, en PWM
+static float vitMes[4] = {0,0,0,0};   // vitesse mesurée filtrée, en ticks/s (signe corrigé)
+static long lastCount[4] = {0,0,0,0};
+static unsigned long lastMicros = 0;
 
 // gestion du multitache. définition de la période de chaque tache
 // definition du nombre de taches maximales
@@ -32,7 +39,7 @@ unsigned long lastSerialActivityMs = 0;
 bool watchdogTripped = false;
 void task0(); // tache permanente de lecture de la liaison série
 void task1(); // arrête les moteurs si la liaison série est perdue
-void task2(); // tache de transition douce pour les moteurs
+void task2(); // [PI] mesure de vitesse + régulation (ou rampe en boucle ouverte)
 void task3(); // [OBSTACLE] tache de surveillance des obstacles
 
 
@@ -68,6 +75,67 @@ void launch_tasks() {
         NameTask[k]() ;                   // on lance la tache k
         timtask[k]=timtask[k]+deltask[k] ;
       }
+}
+
+////////////////////////////////////////////////////////////////////
+//
+// [PI] RÉGULATION DE VITESSE
+//
+////////////////////////////////////////////////////////////////////
+
+static void resetRegulateurs() {
+  for (int i=0; i<4; i++) { ref[i] = 0; integ[i] = 0; }
+}
+
+// remise à zéro complète, appelée par init_arduino() (connexion, déconnexion, reset)
+void initVitesse() {
+  long c[4];
+  noInterrupts();                       // un long n'est pas lu de façon atomique sur AVR
+  for (int i=0; i<4; i++) c[i] = CoderCount[i];
+  interrupts();
+  for (int i=0; i<4; i++) {
+    setpoint[i] = 0;
+    value[i] = 0;
+    lastCount[i] = c[i];
+    vitMes[i] = 0;
+  }
+  resetRegulateurs();
+  lastMicros = micros();
+}
+
+// vitesse mesurée (ticks/s, positive en marche avant) : question P
+int getVitesseMesuree(int i) {
+  return (int)vitMes[i];
+}
+
+// mesure des 4 vitesses ; renvoie dt en s (0 si la mesure n'est pas exploitable)
+static float mesureVitesses() {
+  long c[4];
+  noInterrupts();
+  for (int i=0; i<4; i++) c[i] = CoderCount[i];
+  interrupts();
+
+  unsigned long now = micros();
+  float dt = (now - lastMicros) * 1e-6f;
+  lastMicros = now;
+
+  if (dt <= 0.0f || dt > 0.2f) {        // premier passage ou tâche longtemps suspendue
+    for (int i=0; i<4; i++) lastCount[i] = c[i];
+    return 0.0f;
+  }
+  for (int i=0; i<4; i++) {
+    float v = encSign[i] * (float)(c[i] - lastCount[i]) / dt;
+    lastCount[i] = c[i];
+    vitMes[i] += ALPHA_V * (v - vitMes[i]);   // filtre passe-bas du 1er ordre
+  }
+  return dt;
+}
+
+static void appliquePWM() {
+  FRmotor.setvalue(value[0]);
+  FLmotor.setvalue(value[1]);
+  RRmotor.setvalue(value[2]);
+  RLmotor.setvalue(value[3]);
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -108,6 +176,7 @@ void task1() {
       setpoint[i] = 0;
       value[i] = 0;
     }
+    resetRegulateurs();                 // [PI] sinon l'intégrale relancerait les moteurs
     FRmotor.setvalue(0);
     FLmotor.setvalue(0);
     RRmotor.setvalue(0);
@@ -116,7 +185,63 @@ void task1() {
   }
 }
 
+////////////////////////////////////////////////////////////////////
+// [PI] tache 2 (toutes les 20 ms)
+//   - mesure toujours les vitesses (sert aussi à l'odométrie, question P)
+//   - BOUCLE_FERMEE = 1 : PI par roue avec anticipation, référence rampée (deltaMax)
+//     et anti-windup par intégration conditionnelle
+//   - BOUCLE_FERMEE = 0 : ancienne rampe sur la PWM (boucle ouverte)
+////////////////////////////////////////////////////////////////////
 void task2() {
+  float dt = mesureVitesses();
+
+  if (watchdogTripped) {                // moteurs verrouillés à 0 par task1
+    resetRegulateurs();
+    return;
+  }
+
+  // même règle que task3 : pas de consigne vers l'avant en cas d'obstacle / capteur muet
+  bool arret = obst || muet;
+  if (arret && (setpoint[0]+setpoint[1]+setpoint[2]+setpoint[3] > 0))
+    for (int i=0; i<4; i++) setpoint[i] = 0;
+
+  // freinage d'urgence en cours : task3 pilote directement la PWM
+  if (arret && (value[0]+value[1]+value[2]+value[3] > 0)) {
+    resetRegulateurs();
+    return;
+  }
+
+#if BOUCLE_FERMEE
+  if (dt == 0.0f) return;               // pas de mesure valide : on garde la PWM actuelle
+
+  const float k = 255.0f / VMAX_TICKS;  // ticks/s -> unités de consigne
+
+  for (int i=0; i<4; i++) {
+    // rampe sur la référence (douceur pour la batterie, comme l'ancienne rampe PWM)
+    float sp = setpoint[i];
+    if (ref[i] < sp - deltaMax)      ref[i] += deltaMax;
+    else if (ref[i] > sp + deltaMax) ref[i] -= deltaMax;
+    else                             ref[i] = sp;
+
+    // arrêt franc : pas d'intégrale qui fait bourdonner les moteurs à l'arrêt
+    if (sp == 0 && ref[i] == 0) {
+      integ[i] = 0;
+      value[i] = 0;
+      continue;
+    }
+
+    float e = ref[i] - k * vitMes[i];
+    float iNew = integ[i] + KI_V * e * dt;
+    float u = KFF_V * ref[i] + KP_V * e + iNew;
+
+    // anti-windup : on n'intègre pas si cela pousse plus loin dans la saturation
+    if (!((u > 255.0f && e > 0) || (u < -255.0f && e < 0)))
+      integ[i] = constrain(iNew, -255.0f, 255.0f);
+
+    u = KFF_V * ref[i] + KP_V * e + integ[i];
+    value[i] = (int)constrain(u, -255.0f, 255.0f);
+  }
+#else
   for (int i=0; i<4; i++) {
     if (value[i] < setpoint[i])
       if (value[i] > (setpoint[i]-deltaMax) )
@@ -129,11 +254,9 @@ void task2() {
       else
         value[i] -= deltaMax;
   }
+#endif
 
-  FRmotor.setvalue(value[0]); // after updating the value to improve reactivity to new setpoints
-  FLmotor.setvalue(value[1]);
-  RRmotor.setvalue(value[2]);
-  RLmotor.setvalue(value[3]);
+  appliquePWM();
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -148,6 +271,7 @@ void task2() {
 //  - en présence d'obstacle OU de capteur muet, tout mouvement vers l'avant (somme
 //    des 4 consignes > 0) est annulé et freiné rapidement (OBST_DECEL). Le recul,
 //    la rotation sur place et la translation latérale restent autorisés pour se dégager.
+//  - [PI] pendant ce freinage, task2 ne régule pas (elle remet le PI à zéro).
 ////////////////////////////////////////////////////////////////////
 void task3() {
   static unsigned char nbMuet = 0;             // lectures "capteur muet" consécutives
@@ -208,9 +332,6 @@ void task3() {
       else if (value[i] < setpoint[i] - OBST_DECEL)  value[i] += OBST_DECEL;
       else                                           value[i] = setpoint[i];
     }
-    FRmotor.setvalue(value[0]);
-    FLmotor.setvalue(value[1]);
-    RRmotor.setvalue(value[2]);
-    RLmotor.setvalue(value[3]);
+    appliquePWM();
   }
 }

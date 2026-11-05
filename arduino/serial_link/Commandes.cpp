@@ -264,11 +264,12 @@ void  ENCODER_TIME_code() {
 }
 
 /////////////////////////////////////////////////////////////////////
-// question P,p : renvoie la vitesse des 4 moteurs
+// question P,p : renvoie la vitesse des 4 roues (FR, FL, RR, RL)
+// [PI] en ticks/s, filtrée, positive en marche avant (mesurée dans task2)
 /////////////////////////////////////////////////////////////////////
 
 void SPEED_QUAD_code() {
-  Ret4i(FRmotor.getspeed(),FLmotor.getspeed(),RRmotor.getspeed(),RLmotor.getspeed());
+  Ret4i(getVitesseMesuree(0),getVitesseMesuree(1),getVitesseMesuree(2),getVitesseMesuree(3));
 }
 
 

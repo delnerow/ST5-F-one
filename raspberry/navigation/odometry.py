@@ -1,5 +1,6 @@
 # Distance parcourue en ligne droite depuis la dernière remise à zéro (en mètres).
-# Utilise car.GetSpeed() (commande 'P' de l'Arduino) intégré dans le temps.
+# Utilise car.GetSpeed() (commande 'P' de l'Arduino, en ticks/s, mesurée par la régulation PI)
+# intégré dans le temps.
 #
 # Si le .ino propose un compteur de ticks (retrCmdl dans hardware/serial_protocol.py), c'est plus précis :
 # il suffit alors de réécrire update() en lisant les ticks, le reste du code ne change pas.

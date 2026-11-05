@@ -75,6 +75,7 @@ void init_arduino() {
   FLmotor.setvalue(0);
   RRmotor.setvalue(0);
   RLmotor.setvalue(0);
+  initVitesse();   // [PI] remise à zéro des consignes, PWM, intégrales et compteurs de vitesse
   frontservo.start() ;
   frontservo.setpos((frontservo.getmin()+frontservo.getmax())/2);
 
@@ -83,7 +84,7 @@ void init_arduino() {
   muet=false ;    // [MUET]
   seuilObst=0 ;   // [OBSTACLE] protection désactivée à chaque (dé)connexion
   TaskOn(0) ;     // on allume la tache permanente de lecture de la liaison série
-  TaskOn(2) ;     // on allume la tache transition douce pour les moteurs
+  TaskOn(2) ;     // [PI] on allume la tache de régulation de vitesse des moteurs
   TaskOn(3) ;     // [OBSTACLE] on allume la tache de surveillance des obstacles
 }
 

@@ -412,7 +412,7 @@ def run_grille(mission, drv, odo, link):
             if straight_intersection_pending:
                 print(
                     f"  intersection {loc.candidate_node} entre deux branches droites : "
-                    f"traversée à vitesse lente ({cfg.VITESSE_LENTE} PWM), sans arrêt.",
+                    f"traversée à vitesse lente (consigne {cfg.VITESSE_LENTE}), sans arrêt.",
                     flush=True,
                 )
             loc.on_turn(choix)

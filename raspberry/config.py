@@ -16,9 +16,12 @@ LARGEUR, HAUTEUR = 320, 240
 CAMERA_HFLIP, CAMERA_VFLIP = 1, 1
 
 # ---------------------------------------------------------------- suivi de ligne
-VITESSE = 100                     # PWM, entre -255 et 255
+# [PI] les consignes moteur (commande C, -255..255) sont des consignes de VITESSE :
+#      255 <-> VMAX_TICKS ticks/s (parameters.h de l'Arduino), soit env. 0,87 m/s
+VITESSE = 100                     # consigne de vitesse, entre -255 et 255
 KP = 50
 VITESSE_DEMARRAGE = 100          # (À RÉGLER) consigne pendant le coup de démarrage
+                                 # [PI] probablement inutile en boucle fermée (mettre = VITESSE)
 TEMPS_DEMARRAGE = 0.5            # s
 ZONE_MORTE = 0.08                          # terme dérivé (0 = désactivé)
 INTEGRALE_MAX = 0.5              # limite de l'intégrale, pour qu'elle ne s'emballe pas
@@ -42,8 +45,10 @@ GRID_W, GRID_H = 4, 4            # nombre d'intersections en x et en y (la missi
 CELL_M = 1.0                     # (À CALIBRER) distance entre deux intersections voisines, en m
 
 # ---------------------------------------------------------------- odométrie / localisation
-ENCODER_SCALE = 1.0              # (À CALIBRER) unité de GetSpeed() -> m/s
-ENCODER_SIGN = 1                 # mettre -1 si GetSpeed() est négatif en marche avant
+# GetSpeed() renvoie des ticks/s (front descendant de la voie B : 11 ticks/tr moteur,
+# réducteur 1:21,3 -> 234,3 ticks/tr roue). Roue Ø65 mm : pi x 0,065 / 234,3 = 8,72e-4 m/tick.
+ENCODER_SCALE = 8.72e-4          # (À CALIBRER) m/tick : 3 m poussé à la main / nb moyen de ticks
+ENCODER_SIGN = 1                 # signe déjà corrigé par encSign dans parameters.h de l'Arduino
 APPROACH_OFFSET_M = 0.10         # (À CALIBRER) distance restant à parcourir entre l'événement
                                  # "intersection vue" et le centre du carrefour (phase AVANCE)
 MAX_K_ERROR = 0.7                # écart max (en cases) entre l'encodeur et un nœud candidat

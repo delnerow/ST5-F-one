@@ -29,6 +29,20 @@ const int vitMotor4 = 6;  // motor PWM pin
 const int Encoder4B = 21;  // encoder speed pin -> white
 const int Encoder4A = 34;  // encoder direction pin -> yellow
 
+// [PI] régulation de vitesse en boucle fermée (task2, toutes les 20 ms)
+//   La consigne de la commande C (-255..255) devient une consigne de VITESSE :
+//   255 <-> VMAX_TICKS ticks/s. Les vitesses mesurées sont renvoyées par la question P (ticks/s).
+#define BOUCLE_FERMEE 1          // 0 = ancienne rampe sur la PWM (boucle ouverte)
+#define VMAX_TICKS    1000.0f    // (À CALIBRER) ticks/s mesurés à PWM 255, roues levées, BOUCLE_FERMEE 0
+                                 // théorique : 280 tr/min à vide sous 6 V x 234,3 ticks/tr roue / 60 = 1090
+#define KFF_V         1.0f       // anticipation (1 si VMAX_TICKS est bien calibré)
+#define KP_V          0.6f       // (À RÉGLER) gain proportionnel (PWM par unité de consigne)
+#define KI_V          4.0f       // (À RÉGLER) gain intégral (1/s) ; Ti = KP_V/KI_V ~ constante de temps moteur
+#define ALPHA_V       0.4f       // filtre de la mesure (0..1, 1 = pas de filtre)
+// (À CALIBRER) -1 si le compteur de la roue diminue quand elle tourne en marche avant
+//                     FR  FL  RR  RL
+const int encSign[4] = { 1,  1,  1,  1 };
+
 // [OBSTACLE] capteur ultrason URM37 en mode automatique (une mesure toutes les 25 ms)
 const int URM_ECHO = 2;                  // sortie PWM du capteur (fil vert) -> broche 2 (INT0)
 #define URM_TIMEOUT_MS   200             // sans mesure depuis 200 ms -> capteur considéré muet
