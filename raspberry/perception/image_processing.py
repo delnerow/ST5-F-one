@@ -35,7 +35,7 @@ def traitement(image):
 
 
 def find_line(closed_mask, h):
-    # CORRIGÉ : comme avant, on ne garde que le bas de l'image (ligne juste devant le robot)
+    # On ne garde que le bas de l'image 
     bas = closed_mask[int(HAUT_ZONE * h):, :]
 
     # Find the different contours
