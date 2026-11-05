@@ -36,7 +36,6 @@ ATTENTE_OBSTACLE_S = 3.0         # on attend jusqu'à 3 s que l'obstacle parte a
 MESURES_LIBRES = 3               # obstacle parti si l'Arduino répond "libre" (commande S) 3 fois de suite
 ERREUR_LIGNE_QUITTEE = 0.5       # demi-tour : ligne de départ quittée quand |erreur| > 0.5 (ou plus vue)
 TEMPS_MAX_DEMI_TOUR = 10.0       # s : si le demi-tour n'a pas retrouvé de ligne, on abandonne
-BLOQUER_SEGMENT_URGENCE = True   # grille : la route où l'obstacle est resté est marquée bloquée
 DISTANCE_PROCHE_INTERSECTION = 0.25  # (À CALIBRER) m : obstacle à moins de 0.25 m du dernier carrefour
 # ---------------------------------------------------------------- grille
 GRID_W, GRID_H = 4, 4            # nombre d'intersections en x et en y (la mission peut l'écraser)
