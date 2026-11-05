@@ -52,26 +52,21 @@ def _attendre_obstacle(drv, link):
     
 def _urgence(drv, link):
     """Renvoie "reprise", "demi_tour", "manoeuvre" ou "echec"."""
-    link.urgence_event.clear()
-    cause = "obstacle" if drv.obstacle else "touche"
     drv.stop()
-    print(f"ARRÊT ({cause})")
-    link.send_event("emergency_stop", state=drv.etat, cause=cause)
+    print("ARRÊT (obstacle)")
+    link.send_event("emergency_stop", state=drv.etat, cause="obstacle")
     debut_pause = time.perf_counter()
-    if cause == "obstacle":
-        libre = False if drv.obstacle_confirme else _attendre_obstacle(drv, link)
-        if link.stop_event.is_set():
-            return "echec"
-        if libre:
-            drv.obstacle = False
-            drv.debut += time.perf_counter() - debut_pause   # une manœuvre en cours reprend là où elle en était
-            print("  obstacle parti : reprise")
-            link.send_event("obstacle_cleared")
-            return "reprise"
-        print("  obstacle toujours là")
-        drv.obstacle_confirme = True
-    else:
-        time.sleep(cfg.PAUSE_URGENCE_S)
+    libre = False if drv.obstacle_confirme else _attendre_obstacle(drv, link)
+    if link.stop_event.is_set():
+        return "echec"
+    if libre:
+        drv.obstacle = False
+        drv.debut += time.perf_counter() - debut_pause   # une manœuvre en cours reprend là où elle en était
+        print("  obstacle parti : reprise")
+        link.send_event("obstacle_cleared")
+        return "reprise"
+    print("  obstacle toujours là")
+    drv.obstacle_confirme = True
     if drv.etat not in ("SUIVI", "APPROCHE"):
         if cause == "obstacle" and drv.etat == "AVANCE":
             drv.debut = -1e9          # l'avance vers le centre du carrefour se termine tout de suite
