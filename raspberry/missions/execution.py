@@ -96,6 +96,7 @@ def run_grille(mission, drv, odo, link):
         start=mission.start,
         heading=mission.heading,
         goal=goal,
+        grid_size=mission.grid_size,
     )
     link.send_event("driver_state", state=drv.etat)
     link.send_position(

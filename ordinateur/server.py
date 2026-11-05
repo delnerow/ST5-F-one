@@ -13,8 +13,12 @@
 # TBD : replace 'key' with 'last_key_hit' ?
 #########################################################################
 
-import zmq
+import queue
 import sys
+import threading
+import time
+
+import zmq
 
 server_ip = "192.168.137.1"
 verbose_mode = False
@@ -23,20 +27,90 @@ nodes = list()
 key = '' 
 mission = None          # dernière mission envoyée par control.py
 delivered = set()      # robots qui ont déjà reçu cette mission
+ui_updates = queue.Queue()
+server_stopping = threading.Event()
+last_position_log = {}
 
 
 def main():
-    repsock = create_connection_interface(server_ip)
-
     print("Welcome to server.py")
     print("Waiting for nodes to register...")
-    while True:
-        msg = repsock.recv_pyobj()
-        reply = process_msg(msg)
-        repsock.send_pyobj(reply)
-        if verbose_mode:
-            print("received: {}".format(msg))
-            print("reply: {}".format(reply))
+    import tkinter as tk
+    from tkinter import messagebox
+
+    from grid_preview import GridPreview
+
+    root = tk.Tk()
+    preview = GridPreview(root)
+
+    def update_preview():
+        preview_changed = False
+        try:
+            while True:
+                update = ui_updates.get_nowait()
+                kind = update[0]
+                if kind == "mission_submitted":
+                    preview.hide()
+                elif kind == "robot_update":
+                    _, robot_id, data = update
+                    if data.get("type") == "position":
+                        preview.update_position(robot_id, data, redraw=False)
+                        preview_changed = True
+                    elif data.get("type") == "event":
+                        if data.get("event") == "mission_started" and data.get("mission") == "grille":
+                            try:
+                                preview.show_mission(
+                                    data["start"],
+                                    data["goal"],
+                                    data["grid_size"],
+                                    data["heading"],
+                                )
+                            except (KeyError, TypeError, ValueError) as error:
+                                print(f"Invalid grid preview mission data: {error}")
+                        else:
+                            preview.show_event(data)
+                elif kind == "server_error":
+                    print(f"Server stopped: {update[1]}", file=sys.stderr)
+                    messagebox.showerror("Server error", str(update[1]))
+                    close_server()
+                    return
+        except queue.Empty:
+            pass
+        if preview_changed:
+            preview.refresh()
+        if root.winfo_exists():
+            root.after(50, update_preview)
+
+    def run_server():
+        try:
+            serve()
+        except Exception as error:
+            ui_updates.put(("server_error", error))
+
+    def close_server():
+        server_stopping.set()
+        root.destroy()
+
+    root.protocol("WM_DELETE_WINDOW", close_server)
+    threading.Thread(target=run_server, daemon=True).start()
+    root.after(50, update_preview)
+    root.mainloop()
+
+
+def serve():
+    repsock = create_connection_interface(server_ip)
+    try:
+        while not server_stopping.is_set():
+            if not repsock.poll(100):
+                continue
+            msg = repsock.recv_pyobj()
+            reply = process_msg(msg)
+            repsock.send_pyobj(reply)
+            if verbose_mode:
+                print("received: {}".format(msg))
+                print("reply: {}".format(reply))
+    finally:
+        repsock.close(linger=0)
 
 
 def process_msg(msg):
@@ -75,6 +149,7 @@ def process_msg(msg):
         if (msg["cmd"] == "mission"):
             mission = msg["mission"]
             delivered.clear()
+            ui_updates.put(("mission_submitted", mission))
             print("new mission: {}".format(mission))
         reply = default_reply
 
@@ -83,19 +158,24 @@ def process_msg(msg):
         for update in msg.get("updates", []):
             update_type = update.get("type")
             if update_type == "position":
-                print(
-                    "[{}] position: ({:.2f}, {:.2f}) node={} cap={} "
-                    "distance={:.2f} m confiance={}".format(
-                        msg["from"],
-                        update.get("x", 0.0),
-                        update.get("y", 0.0),
-                        update.get("candidate_node", update.get("node")),
-                        update.get("heading", "?"),
-                        update.get("distance_m", 0.0),
-                        update.get("confidence", "?"),
+                now = time.monotonic()
+                if now - last_position_log.get(msg["from"], 0.0) >= 1.0:
+                    print(
+                        "[{}] position: ({:.2f}, {:.2f}) node={} cap={} "
+                        "distance={:.2f} m confiance={}".format(
+                            msg["from"],
+                            update.get("x", 0.0),
+                            update.get("y", 0.0),
+                            update.get("candidate_node", update.get("node")),
+                            update.get("heading", "?"),
+                            update.get("distance_m", 0.0),
+                            update.get("confidence", "?"),
+                        )
                     )
-                )
+                    last_position_log[msg["from"]] = now
+                ui_updates.put(("robot_update", msg["from"], update))
             elif update_type == "event":
+                ui_updates.put(("robot_update", msg["from"], update))
                 if update.get("event") == "debug_image_timing":
                     print(
                         "[{}] debug image: capture={:.2f} ms, prétraitement={:.2f} ms, "
