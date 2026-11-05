@@ -203,6 +203,7 @@ def run_grille(mission, drv, odo, link):
 
     # 2. Boucle principale
     last_log = 0.0
+    bloc_en_attente = None          # route à bloquer après un demi-tour (appliqué au prochain centre)
     while not link.stop_event.is_set():
         event = _step_and_report(drv, link)
         odo.update(drv.straight)
