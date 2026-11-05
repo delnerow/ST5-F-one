@@ -75,7 +75,10 @@ class ServerLink:
         utilise la socket (une socket ZMQ ne se partage pas entre threads)."""
         def loop():
             pending_updates = []
-            while not self._closing.is_set():
+            while True:
+                # lu AVANT de vider la file : les messages mis en file juste avant
+                # close() (cause d'un arrêt d'urgence, fin de mission) partent encore
+                closing = self._closing.is_set()
                 while True:
                     try:
                         pending_updates.append(self._updates.get_nowait())
@@ -88,6 +91,8 @@ class ServerLink:
                 if reply and reply.get("key") in cfg.STOP_KEYS:
                     print("Touche d'arrêt reçue.")
                     self.stop_event.set()
+                if closing:
+                    break
                 self._closing.wait(cfg.KEY_POLL_S)
         self._thread = threading.Thread(target=loop, daemon=True)
         self._thread.start()
@@ -114,6 +119,7 @@ class ServerLink:
     def close(self):
         self._closing.set()
         if self._thread is not None:
-            self._thread.join(timeout=cfg.REQUEST_TIMEOUT_MS / 1000 + 1)
+            # un dernier envoi (au plus REQUEST_TIMEOUT_MS) peut être en cours
+            self._thread.join(timeout=2 * cfg.REQUEST_TIMEOUT_MS / 1000 + 1)
         self.sock.close(linger=0)
         self.ctx.term()

@@ -48,3 +48,6 @@ OBSTACLE_CONFIRMATION_MEASURES = 5
 OBSTACLE_FIRST_INTERSECTION_MAX_CM = 140
 OBSTACLE_SECOND_INTERSECTION_MIN_CM = 160
 LOG_PERIOD_S = 1.0
+ARDUINO_OBSTACLE_STOP_CM = 15    # (À RÉGLER) arrêt d'urgence géré par l'Arduino (commande D).
+                                 # 0 = désactivé. Activé, un capteur ultrason muet bloque
+                                 # aussi l'avance (cause 'muet').

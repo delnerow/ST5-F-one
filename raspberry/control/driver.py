@@ -4,17 +4,24 @@
 #
 # États : SUIVI -> APPROCHE -> ATTENTE -> AVANCE -> (TOURNE) -> SUIVI
 #                                                \-> ARRET (si choose('stop'))
+#         n'importe quel état -> ARRET (touche d'arrêt ou arrêt de sécurité de l'Arduino)
 #
 # Événements renvoyés par step() (ou None) :
 #   ("INTERSECTION", ['gauche', 'devant', ...])  robot arrêté aprés avoir depassé l'intersection en CAMERA, en attente de choose()
 #   ("CENTERED", None)                           robot au centre du carrefour
 #   ("TURN_DONE", None)                          rotation terminée, ligne retrouvée
 #   ("STOPPED", None)                            arrêt demandé par choose('stop') effectué
+#   ("ABORTED", None)                            arrêt d'urgence (voir cause_arret)
+#
+# Arrêt de sécurité de l'Arduino : l'acquittement d'une commande moteur commence par
+# WD (watchdog), OB (obstacle) ou MU (capteur ultrason muet). Le Driver passe alors en
+# ARRET de façon verrouillée, mémorise la cause dans cause_arret et lève stop_event,
+# même si l'Arduino libère ensuite l'obstacle.
 
 import time
 
 import config as cfg
-from hardware.serial_protocol import sendCmdi
+from hardware.serial_protocol import ArduinoStop, sendCmdi
 from perception.image_processing import traitement, find_line, find_intersection
 
 DIRECTIONS = ['gauche', 'devant', 'droite']
@@ -36,6 +43,7 @@ class Driver:
         self.t_prec = 0.0
         self.sans_inter = 0
         self.detecter_intersections = True   # False sur le 8 : suivi de ligne pur
+        self.cause_arret = None       # 'watchdog', 'obstacle', 'muet' ou None (opérateur)
 
     @property
     def straight(self):
@@ -50,7 +58,20 @@ class Driver:
         g = int(max(-255, min(255, gauche)))
         d = int(max(-255, min(255, droite)))
         # ordre dans serial_link : avant droit, avant gauche, arrière droit, arrière gauche
-        sendCmdi(self.car.serialport, b'C', d, g, d, g)
+        try:
+            sendCmdi(self.car.serialport, b'C', d, g, d, g)
+        except ArduinoStop as e:
+            self._arret_arduino(e.cause)
+
+    def _arret_arduino(self, cause):
+        """Arrêt de sécurité signalé par l'Arduino : verrouille ARRET et prévient la mission."""
+        deja_arrete = self.stop_event is not None and self.stop_event.is_set()
+        if self.cause_arret is None and not deja_arrete:
+            self.cause_arret = cause
+            print(f"Arrêt de sécurité Arduino : {cause}")
+        self.etat = "ARRET"
+        if self.stop_event is not None:
+            self.stop_event.set()
 
     def stop(self):
         self.moteurs(0, 0)
@@ -98,12 +119,20 @@ class Driver:
             erreur = erreur - cfg.ZONE_MORTE/2
         elif erreur < 0 :
             erreur = erreur  + cfg.ZONE_MORTE/2
-        correction = cfg.KP * erreur 
+        correction = cfg.KP * erreur
         self.moteurs(vitesse + correction, vitesse - correction)
 
     def step(self):
         if self._abort_if_requested():
             return ("ABORTED", None)
+        event = self._step()
+        # un arrêt de sécurité a pu survenir pendant une commande moteur de ce tour :
+        # il l'emporte sur tout événement (et sur un changement d'état) de ce tour
+        if self._abort_if_requested():
+            return ("ABORTED", None)
+        return event
+
+    def _step(self):
         if self.etat in ("ATTENTE", "ARRET"):
             time.sleep(0.02)
             return None

@@ -14,6 +14,8 @@ def open_arduino():
     arduino = ard(cfg.ARDUINO_PORT)
     if not arduino.connect():
         raise RuntimeError("L'Arduino ne répond pas")
+    # la protection est remise à 0 à chaque connexion : on la réactive ici
+    arduino.SetObstacleProtection(cfg.ARDUINO_OBSTACLE_STOP_CM)
     return arduino
 
 

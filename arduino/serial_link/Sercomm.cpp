@@ -7,14 +7,15 @@
 #include "Sercomm.h"
 extern char commode ;
 extern char feedback ;
-extern bool obst ; 
+extern bool obst ;
+extern bool muet ;      // [MUET] capteur ultrason muet
 
 char dispstring[33] ;   // chaine de retour de commande
 
 // Routine de recuperation d'un caractere
 char GetChar(char def)
-{   
-    if (Serial.available()>0)  // liaison série vide 
+{
+    if (Serial.available()>0)  // liaison série vide
       return(Serial.read());
     else
       return(def) ;
@@ -23,21 +24,21 @@ char GetChar(char def)
 // routine de récupération d'un nombre entier sur la liaison série
 // le codage sera ascii ou binaire selon la variable 'commode'
 int GetInt(int def)
-{   
+{
     int tmp ;
     char c ;
     if (commode==0) {
       c=Serial.peek() ;
       if (c==' ') {Serial.read(); c=Serial.peek() ;}
-      if ((c=='-') || ((c>='0') && (c<='9'))) 
+      if ((c=='-') || ((c>='0') && (c<='9')))
         return(Serial.parseInt()); // on recupere la commande du moteur
       else
-        return(def) ; }  // renvoie la valeur par défaut 
+        return(def) ; }  // renvoie la valeur par défaut
     else {
       Serial.readBytes((char*)&tmp,2);
       return(tmp) ;
     }
-    
+
 }
 
 // routine de récupération d'un nombre entier long (32 bits) sur la liaison série
@@ -49,7 +50,7 @@ long int GetLong(long def)
     if (commode==0) {
       c=Serial.peek() ;
       if (c==' ') {Serial.read(); c=Serial.peek() ;}
-      if ((c=='-') || ((c>='0') && (c<='9'))) 
+      if ((c=='-') || ((c>='0') && (c<='9')))
       {
         tmp=Serial.parseInt() ;
         return(tmp); // on recupere la commande du moteur
@@ -64,11 +65,11 @@ long int GetLong(long def)
 
 // Routine de recuperation d'une chaine de caractères
 char* GetString()
-{  
-    char ind=0; 
+{
+    char ind=0;
     char c=0;
     bool eol=false;
-    while (eol==false)  // liaison série vide    Serial.available()>0 && 
+    while (eol==false)  // liaison série vide    Serial.available()>0 &&
     {
       c=Serial.read();
       if (c=='\n')
@@ -78,7 +79,7 @@ char* GetString()
     }
       dispstring[ind]=0 ;
       return(dispstring) ;
-} 
+}
 
 
 // bibliothèque de renvoi de valeurs binaires sur la liaison série
@@ -91,19 +92,24 @@ void write_i16(int num)
 void write_i32(long num)
 { Serial.write((uint8_t*)&num, 4); }
 
-// routine renvoyant le message d'acquitement simple (OK ou OBstacle)
+// routine renvoyant le message d'acquitement simple (OK, OBstacle ou MUet)
+// [MUET] le capteur muet est prioritaire : l'état obstacle n'est alors plus mis à jour
 void RetAcquitSimpl()
 {
-    if (feedback==1) 
-      if (obst==false) Serial.println(F("OK")); 
-      else Serial.println(F("OB"));
+    if (feedback==1) {
+      if (muet)            Serial.println(F("MU"));
+      else if (obst==false) Serial.println(F("OK"));
+      else                 Serial.println(F("OB"));
+    }
 }
 
 void Acquit()
 {
-    if (feedback==1) 
-      if (obst==false) Serial.println(F("OK")); 
-      else Serial.println(F("OB"));
+    if (feedback==1) {
+      if (muet)            Serial.println(F("MU"));
+      else if (obst==false) Serial.println(F("OK"));
+      else                 Serial.println(F("OB"));
+    }
 }
 
 // routine renvoyant un message d'acquitement et une chaine de caractère
@@ -112,8 +118,8 @@ void RetAcquit(__FlashStringHelper* strng)
     Acquit() ;
     if (feedback==2)
     {
-      Serial.println(strng); 
-    }  
+      Serial.println(strng);
+    }
 }
 
 // routine renvoyant un message d'acquitement, une chaine de caractère et 1 valeur entière
@@ -122,9 +128,9 @@ void RetAcquit(__FlashStringHelper* strng,int val)
     Acquit() ;
     if (feedback==2)
     {
-      Serial.print(strng); 
-      Serial.println(val); 
-    }  
+      Serial.print(strng);
+      Serial.println(val);
+    }
 }
 
 // routine renvoyant un message d'acquitement, une chaine de caractère et 2 valeurs entières
@@ -133,11 +139,11 @@ void RetAcquit(__FlashStringHelper* strng,int val1,int val2 )
     Acquit() ;
     if (feedback==2)
     {
-      Serial.print(strng); 
-      Serial.print(val1); 
-      Serial.print(F(" ")); 
-      Serial.println(val2); 
-    }  
+      Serial.print(strng);
+      Serial.print(val1);
+      Serial.print(F(" "));
+      Serial.println(val2);
+    }
 }
 
 // routine renvoyant un message d'acquitement, une chaine de caractère et 2 valeurs long
@@ -146,11 +152,11 @@ void RetAcquit(__FlashStringHelper* strng,long  val1,long  val2 )
     Acquit() ;
     if (feedback==2)
     {
-      Serial.print(strng); 
-      Serial.print(val1); 
-      Serial.print(F(" ")); 
-      Serial.println(val2); 
-    }  
+      Serial.print(strng);
+      Serial.print(val1);
+      Serial.print(F(" "));
+      Serial.println(val2);
+    }
 }
 
 // routine renvoyant un message d'acquitement, une chaine de caractère et 3 valeurs entières
@@ -159,13 +165,13 @@ void RetAcquit(__FlashStringHelper* strng,int val1,int val2, int val3 )
     Acquit() ;
     if (feedback==2)
     {
-      Serial.print(strng); 
-      Serial.print(val1); 
-      Serial.print(F(" ")); 
-      Serial.print(val2); 
-      Serial.print(F(" ")); 
-      Serial.println(val3); 
-    }  
+      Serial.print(strng);
+      Serial.print(val1);
+      Serial.print(F(" "));
+      Serial.print(val2);
+      Serial.print(F(" "));
+      Serial.println(val3);
+    }
 }
 
 // routine renvoyant un message d'acquitement, une chaine de caractère et 4 valeurs entières
@@ -174,15 +180,15 @@ void RetAcquit(__FlashStringHelper* strng,int val1,int val2, int val3, int val4 
     Acquit() ;
     if (feedback==2)
     {
-      Serial.print(strng); 
-      Serial.print(val1); 
-      Serial.print(F(" ")); 
-      Serial.print(val2); 
-      Serial.print(F(" ")); 
-      Serial.print(val3); 
-      Serial.print(F(" ")); 
-      Serial.println(val4); 
-    }  
+      Serial.print(strng);
+      Serial.print(val1);
+      Serial.print(F(" "));
+      Serial.print(val2);
+      Serial.print(F(" "));
+      Serial.print(val3);
+      Serial.print(F(" "));
+      Serial.println(val4);
+    }
 }
 
 // routine renvoyant 2 valeurs long

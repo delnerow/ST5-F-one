@@ -13,6 +13,7 @@
 //
 // [OBSTACLE] ajouts : mesure ultrason URM37 par interruption,
 //            requête S (distance), commande D (protection), tâche 3 (arrêt de sécurité)
+// [MUET] ajout : état "capteur ultrason muet" séparé de l'état obstacle
 //
 // //////////////////////////////////////////////////-
 //
@@ -37,6 +38,7 @@
 /////////////////////////////////////////////////////////////////////////
 
 bool obst=false ;    // obstacle détecté
+bool muet=false ;    // [MUET] capteur ultrason muet (débranché, en panne)
 bool ConnOn ;        // indique si la carte est connectée
 char feedback ;      // si non nul indique que les commandes doivent renvoyer un acquitement
 char commode=0 ;     // indique le mode de communication 0=tout en ASCII, 1 les commandes sont en binaire et les retours en ascii, 2 tout est en binaire
@@ -78,6 +80,7 @@ void init_arduino() {
 
   TaskOffAll();
   obst=false ;
+  muet=false ;    // [MUET]
   seuilObst=0 ;   // [OBSTACLE] protection désactivée à chaque (dé)connexion
   TaskOn(0) ;     // on allume la tache permanente de lecture de la liaison série
   TaskOn(2) ;     // on allume la tache transition douce pour les moteurs
@@ -162,7 +165,7 @@ int getDistanceCm() {
   if ((derniere == 0) || (millis() - derniere > URM_TIMEOUT_MS))
     return -1;                    // aucune mesure récente : capteur muet
   unsigned long cm = duree / 50;  // 50 µs = 1 cm
-  if (cm > 900)
+  if (cm > 250)
     return DIST_HORS_PORTEE;      // mesure invalide (impulsion de 50 000 µs) : rien devant
   return (int)cm;
 }

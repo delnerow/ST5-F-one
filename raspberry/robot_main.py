@@ -10,6 +10,7 @@ import sys
 
 import config as cfg
 from communication.server import ServerLink
+from hardware.serial_protocol import ArduinoStop
 
 
 def main():
@@ -47,11 +48,20 @@ def main():
             drv.stop()
     except KeyboardInterrupt:
         print("Arrêt demandé")
+    except (ArduinoStop, TimeoutError) as e:
+        # ArduinoStop est normalement géré par le Driver ; TimeoutError = Arduino qui
+        # n'acquitte plus (câble, alimentation) : c'est aussi un arrêt d'urgence.
+        cause = getattr(e, "cause", "timeout_serie")
+        print(f"Arrêt d'urgence : {cause}")
+        link.stop_event.set()
+        link.send_event("emergency_stop", cause=cause)
     finally:
         try:
             if arduino is not None:
                 try:
                     arduino.Stop()
+                except TimeoutError:
+                    pass                  # Arduino muet : on tente quand même la déconnexion
                 finally:
                     arduino.disconnect()
         finally:

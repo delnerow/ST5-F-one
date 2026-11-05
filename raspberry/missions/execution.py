@@ -39,6 +39,14 @@ def _choose_and_report(drv, link, choice):
     _report_state_transition(drv, link, previous_state)
 
 
+def _interrupt(drv, link, mission):
+    """Arrête les moteurs et signale l'interruption avec sa cause."""
+    drv.stop()
+    cause = drv.cause_arret or "operateur"     # 'watchdog', 'obstacle', 'muet' ou 'operateur'
+    print(f"Mission interrompue ({cause}).")
+    link.send_event("mission_interrupted", mission=mission, cause=cause)
+
+
 def _plan_from(grid, loc, goal):
     return plan_path(grid, loc.candidate_node, loc.heading, goal, allow_uturn=False)
 
@@ -128,8 +136,7 @@ def run_grille(mission, drv, odo, link):
             drv.turn_in_place(rel, 1)
         _report_state_transition(drv, link, previous_state)
         if not _wait_event(drv, link, "TURN_DONE"):
-            drv.stop()
-            link.send_event("mission_interrupted", mission="grille")
+            _interrupt(drv, link, "grille")
             return False
         loc.heading = first_h
         link.send_event("heading_changed", heading=loc.heading)
@@ -225,8 +232,7 @@ def run_grille(mission, drv, odo, link):
             )
             return completed
 
-    drv.stop()
-    link.send_event("mission_interrupted", mission="grille")
+    _interrupt(drv, link, "grille")
     return False
 
 
@@ -244,6 +250,5 @@ def run_huit(mission, drv, odo, link):
             _choose_and_report(
                 drv, link, 'devant' if 'devant' in branches else branches[0]
             )
-    link.send_event("mission_interrupted", mission="huit")
-    drv.stop()
-    return True
+    _interrupt(drv, link, "huit")
+    return drv.cause_arret is None          # arrêt opérateur = fin normale du 8

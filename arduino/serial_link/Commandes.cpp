@@ -17,6 +17,7 @@ extern int setpoint[4]; // PWM setpoints between -255 and 255
 
 extern long int volatile CoderCount[] ;
 extern bool obst;
+extern bool muet;               // [MUET] capteur ultrason muet
 extern MyServo frontservo;
 extern char feedback ;
 extern char commode ;
@@ -48,7 +49,7 @@ void CONNECT_code() {
   commode= GetChar(0);
   if (commode>0) commode-='0'; else commode=0 ;
   if (ConnOn==false || watchdogTripped)
-    { 
+    {
       ConnOn = true ;
       watchdogTripped = false;
       init_arduino() ;
@@ -98,7 +99,10 @@ void SINGLEMOTOR_code() {
     //mx->setvalue(nivM) ;
     setpoint[m-'0'-1] = nivM;
 
-    if (obst==false)
+    // [MUET] priorité au capteur muet : l'état obstacle n'est plus mis à jour
+    if (muet)
+        RetAcquit(F("MU capteur ultrason muet moteur non allumé"));
+    else if (obst==false)
         RetAcquit(F("OK Moteur mis à la consigne : "),(int)(m-'0'),nivM);
     else
         RetAcquit(F("OB stacle détecté moteur non allumé"));
@@ -135,7 +139,10 @@ void QUADMOTOR_code() {
   setpoint[3] = nivM4;
 
   //reponse de la commande
-  if (obst==false)
+  // [MUET] priorité au capteur muet : l'état obstacle n'est plus mis à jour
+  if (muet)
+        RetAcquit(F("MU capteur ultrason muet moteur non allumé"));
+  else if (obst==false)
         RetAcquit(F("OK Moteurs mis aux consignes : "),nivM1,nivM2,nivM3,nivM4);
   else
         RetAcquit(F("OB stacle détecté moteur non allumé"));
@@ -201,7 +208,7 @@ void PROTECT_IR_code() {
 //   D0   -> protection désactivée
 //   D20  -> protection activée, arrêt sous 20 cm (ASCII)
 //   en binaire : 'D' + 4 entiers 16 bits, seul le premier compte (le seuil)
-// chaque appel réinitialise la détection
+// chaque appel réinitialise la détection (obstacle et capteur muet)
 //////////////////////////////////////////////////////////
 
 void PROTECT_US_code() {
@@ -212,6 +219,7 @@ void PROTECT_US_code() {
   if (seuil > 300) seuil = 300;
   seuilObst = seuil;
   obst = false;
+  muet = false;                       // [MUET]
   RetAcquit(F("OK protection obstacle, seuil (cm) = "), seuil);
 }
 
@@ -273,13 +281,13 @@ void  INFRARED_TIME_code() {
 }
 
 /////////////////////////////////////////////////////////////////////
-// [OBSTACLE] question S,s : renvoie la distance ultrason et l'état obstacle
-//   réponse : distance (cm) puis obstacle (0 ou 1)
+// [OBSTACLE] question S,s : renvoie la distance ultrason et l'état de sécurité
+//   réponse : distance (cm) puis état (0 = libre, 1 = obstacle, 2 = capteur muet)
 //   distance = 999 si rien devant, -1 si capteur muet
-//   ASCII : "35 0"    binaire : 4 entiers 16 bits (distance, obstacle, 0, 0)
+//   ASCII : "35 0"    binaire : 4 entiers 16 bits (distance, état, 0, 0)
 /////////////////////////////////////////////////////////////////////
 void  ULTRASON_code() {
-  Ret2i(getDistanceCm(), obst ? 1 : 0);
+  Ret2i(getDistanceCm(), muet ? 2 : (obst ? 1 : 0));
 }
 
 /////////////////////////////////////////////////////////////////////

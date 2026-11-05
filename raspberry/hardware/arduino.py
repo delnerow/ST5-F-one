@@ -2,17 +2,17 @@
 # CENTRALESUPELEC : ST5 VAC challenge week
 #########################################################################
 
-import serial 
+import serial
 import time
 import numpy as np
-from hardware.serial_protocol import WaitACK, retrCmdi, sendCmdi
+from hardware.serial_protocol import ArduinoStop, WaitACK, retrCmdi, sendCmdi
 
 
 class arduino:
 
     def __init__(self,portnr):
         self.serialport = serial.Serial(port=portnr, baudrate=115200, timeout=0.1)
-        
+
     #######################################
     #   connection to Arduino
     #######################################
@@ -35,8 +35,8 @@ class arduino:
             return True
         else:
             return False
-  
-        
+
+
     #######################################
     #   disconnection
     #######################################
@@ -48,7 +48,18 @@ class arduino:
     #   stop motors
     #######################################
     def  Stop(self):
-        sendCmdi(self.serialport,b'C',0,0,0,0)
+        try:
+            sendCmdi(self.serialport,b'C',0,0,0,0)
+        except ArduinoStop:
+            # OB/MU : la consigne 0 est quand même appliquée ; WD : moteurs déjà verrouillés à 0
+            pass
+
+    #######################################
+    #   protection anti-collision (commande D)
+    #   seuil_cm = 0 désactive la protection
+    #######################################
+    def  SetObstacleProtection(self,seuil_cm):
+        sendCmdi(self.serialport,b'D',int(seuil_cm),0,0,0)
 
     #######################################
     #   moving forward
@@ -57,7 +68,7 @@ class arduino:
         sendCmdi(self.serialport,b'C',c1,c2,c1,c2)
 
     #######################################
-    #   mise en route des moteurs en sens inverse 
+    #   mise en route des moteurs en sens inverse
     #######################################
     def  Back(self,c1,c2):
         sendCmdi(self.serialport,b'C',-c1,-c2,-c1,-c2)
@@ -86,4 +97,4 @@ class arduino:
     #######################################################
     def  GetSpeed(self):
         vit1,vit2,vit3,vit4 = retrCmdi(self.serialport,b'P')
-        return vit1,vit2,vit3,vit4
+        return vit1,vit2,vit3,vit4

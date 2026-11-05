@@ -89,6 +89,12 @@ Pendant une mission sur grille, le Raspberry Pi transmet au serveur les estimati
 
 La carte Arduino ne transmet pas de données spontanément : elle répond aux requêtes du Raspberry Pi. Toute activité série entrante (commande moteur ou lecture de capteurs) renouvelle le watchdog. Si aucune activité n’est reçue pendant 750 ms alors qu’une consigne moteur est non nulle, l’Arduino arrête et verrouille les moteurs; il ignore ensuite les commandes de mouvement jusqu’à une nouvelle connexion explicite. Les attentes d’acquittement série du Raspberry Pi expirent après 0,5 s et lèvent `TimeoutError`. Ce watchdog doit être validé sur banc, roues levées, avant tout essai sur piste; il ne remplace pas un arrêt d’urgence matériel.
 
+### Arrêts de sécurité de l’Arduino
+
+Au démarrage d’une mission, le Raspberry Pi active la protection ultrason de l’Arduino (commande `D`, seuil `ARDUINO_OBSTACLE_STOP_CM` dans `raspberry/config.py`, `0` pour la désactiver). L’Arduino bloque alors toute avance dans deux cas : obstacle plus proche que le seuil (`obst`), ou capteur ultrason qui ne répond plus (`muet`, 5 lectures muettes de suite, levé dès qu’une mesure valide revient). Le recul et la rotation restent autorisés.
+
+Le préfixe de l’acquittement de chaque commande moteur indique la cause : `WD` (watchdog), `OB` (obstacle) ou `MU` (capteur muet, prioritaire sur `OB`). La requête `S` renvoie la distance et l’état (`0` libre, `1` obstacle, `2` capteur muet). Dès qu’un de ces préfixes est reçu, le driver passe en `ARRET` de façon verrouillée (même si l’Arduino lève ensuite l’obstacle), arrête la mission et envoie au serveur l’événement `mission_interrupted` avec `cause` = `watchdog`, `obstacle`, `muet` ou `operateur`. Une absence d’acquittement série (`TimeoutError`) produit l’événement `emergency_stop` avec `cause` = `timeout_serie`. Avec la protection active, un capteur ultrason débranché empêche donc le robot d’avancer.
+
 ## Calibrage et limites
 
 - Mesurez et ajustez `CELL_M`, `ENCODER_SCALE`, `ENCODER_SIGN` et `APPROACH_OFFSET_M` dans `raspberry/config.py` pour la piste et les encodeurs utilisés.
@@ -102,3 +108,4 @@ La carte Arduino ne transmet pas de données spontanément : elle répond aux re
 - **L’Arduino ne répond pas** : vérifiez l’alimentation, le câble USB, le port série configuré et que le sketch a bien été téléversé.
 - **La caméra ne démarre pas** : vérifiez sa connexion et l’installation de `Picamera2`/`libcamera` sur Raspberry Pi OS.
 - **Le suivi ou les intersections sont instables** : vérifiez l’éclairage, le cadrage de la caméra et les paramètres de traitement et de calibrage.
+- **Le robot refuse d’avancer (cause `muet`)** : vérifiez le câblage du capteur ultrason (sortie PWM sur la broche 2) ou mettez `ARDUINO_OBSTACLE_STOP_CM = 0` pour désactiver la protection.
