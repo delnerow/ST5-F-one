@@ -49,7 +49,54 @@ def _attendre_obstacle(drv, link):
             return True
         time.sleep(0.1)
     return False
-
+    
+def _urgence(drv, link):
+    """Renvoie "reprise", "demi_tour", "manoeuvre" ou "echec"."""
+    link.urgence_event.clear()
+    cause = "obstacle" if drv.obstacle else "touche"
+    drv.stop()
+    print(f"ARRÊT ({cause})")
+    link.send_event("emergency_stop", state=drv.etat, cause=cause)
+    debut_pause = time.perf_counter()
+    if cause == "obstacle":
+        libre = False if drv.obstacle_confirme else _attendre_obstacle(drv, link)
+        if link.stop_event.is_set():
+            return "echec"
+        if libre:
+            drv.obstacle = False
+            drv.debut += time.perf_counter() - debut_pause   # une manœuvre en cours reprend là où elle en était
+            print("  obstacle parti : reprise")
+            link.send_event("obstacle_cleared")
+            return "reprise"
+        print("  obstacle toujours là")
+        drv.obstacle_confirme = True
+    else:
+        time.sleep(cfg.PAUSE_URGENCE_S)
+    if drv.etat not in ("SUIVI", "APPROCHE"):
+        if cause == "obstacle" and drv.etat == "AVANCE":
+            drv.debut = -1e9          # l'avance vers le centre du carrefour se termine tout de suite
+            print("  au carrefour : l'avance vers le centre s'arrête ici")
+        else:
+            drv.debut += time.perf_counter() - debut_pause
+            print("  à une intersection : pas de demi-tour, la manœuvre reprend")
+        drv.obstacle = False
+        return "manoeuvre"
+    previous_state = drv.etat
+    drv.obstacle_confirme = False
+    drv.demi_tour()
+    _report_state_transition(drv, link, previous_state)
+    while not link.stop_event.is_set():
+        ev = _step_and_report(drv, link)
+        if ev and ev[0] == "UTURN_DONE":
+            drv.obstacle = False      # les "OB" reçus pendant la rotation ne comptent pas
+            print("  demi-tour terminé, reprise")
+            link.send_event("uturn_completed")
+            return "demi_tour"
+        if ev and ev[0] == "UTURN_FAILED":
+            print("  demi-tour impossible : ligne non retrouvée")
+            link.send_event("uturn_failed")
+            return "echec"
+    return "echec"
 
 def _interrupt(drv, link, mission):
     """Arrête les moteurs et signale l'interruption avec sa cause."""
