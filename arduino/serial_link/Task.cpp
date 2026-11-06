@@ -128,6 +128,9 @@ static float mesureVitesses() {
     lastCount[i] = c[i];
     vitMes[i] += ALPHA_V * (v - vitMes[i]);   // filtre passe-bas du 1er ordre
   }
+  // encodeur HS : on renvoie la vitesse de la roue recopiée (estimation pour l'odométrie)
+  for (int i=0; i<4; i++)
+    if (copieDe[i] >= 0) vitMes[i] = vitMes[copieDe[i]];
   return dt;
 }
 
@@ -189,7 +192,8 @@ void task1() {
 // [PI] tache 2 (toutes les 20 ms)
 //   - mesure toujours les vitesses (sert aussi à l'odométrie, question P)
 //   - BOUCLE_FERMEE = 1 : PI par roue avec anticipation, référence rampée (deltaMax)
-//     et anti-windup par intégration conditionnelle
+//     et anti-windup par intégration conditionnelle ; une roue à encodeur HS
+//     (copieDe dans parameters.h) recopie la PWM d'une autre roue
 //   - BOUCLE_FERMEE = 0 : ancienne rampe sur la PWM (boucle ouverte)
 ////////////////////////////////////////////////////////////////////
 void task2() {
@@ -230,6 +234,12 @@ void task2() {
       continue;
     }
 
+    // encodeur HS : pas de PI pour cette roue (commande recopiée après la boucle)
+    if (copieDe[i] >= 0) {
+      integ[i] = 0;
+      continue;
+    }
+
     float e = ref[i] - k * vitMes[i];
     float iNew = integ[i] + KI_V * e * dt;
     float u = KFF_V * ref[i] + KP_V * e + iNew;
@@ -240,6 +250,15 @@ void task2() {
 
     u = KFF_V * ref[i] + KP_V * e + integ[i];
     value[i] = (int)constrain(u, -255.0f, 255.0f);
+  }
+
+  // encodeur HS : même consigne -> même PWM que la roue recopiée,
+  // sinon (consignes différentes) anticipation seule, en boucle ouverte
+  for (int i=0; i<4; i++) {
+    int j = copieDe[i];
+    if (j < 0 || (setpoint[i] == 0 && ref[i] == 0)) continue;
+    if (setpoint[i] == setpoint[j]) value[i] = value[j];
+    else value[i] = (int)constrain(KFF_V * ref[i], -255.0f, 255.0f);
   }
 #else
   for (int i=0; i<4; i++) {

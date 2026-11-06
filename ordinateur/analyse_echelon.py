@@ -73,6 +73,7 @@ def main():
     p.add_argument("fichier", nargs="?")
     p.add_argument("--tau-bf", type=float, default=0.15, help="constante de temps souhaitée en boucle fermée (s)")
     p.add_argument("--vmax", type=float, default=1000.0, help="VMAX_TICKS de parameters.h")
+    p.add_argument("--roues-hs", default="FL", help="roues à encodeur HS, ignorées (ex. FL ou FL,RR ; vide = aucune)")
     args = p.parse_args()
 
     fichier = args.fichier
@@ -92,7 +93,11 @@ def main():
 
     print(f"\n{'roue':>4} {'K':>6} {'tau':>6} {'u0':>6}   {'KP_V':>6} {'KI_V':>6}")
     gains = []
+    hs = {r.strip().upper() for r in args.roues_hs.split(",") if r.strip()}
     for r in ROUES:
+        if r in hs:
+            print(f"{r:>4}   encodeur HS, ignorée")
+            continue
         v, u = k * d[f"v_{r}"], d[f"pwm_{r}"]
         K, tau, u0 = identifie(t, u, v)
         kp = tau / (K * args.tau_bf)

@@ -77,6 +77,12 @@ def diff(c0, c1):
     return [x1 - x0 for x0, x1 in zip(c0, c1)]
 
 
+def moyenne_valides(valeurs):
+    """Moyenne des |valeurs| des roues dont l'encodeur n'est pas HS (config.ROUES_HS)."""
+    v = [abs(x) for r, x in zip(ROUES, valeurs) if r not in cfg.ROUES_HS]
+    return sum(v) / len(v)
+
+
 # ---------------------------------------------------------------- essai 1 : ticks par tour
 def essai_tours(a, n_tours=10):
     print(f"Marquez chaque roue, puis faites-leur faire {n_tours} tours à la main,")
@@ -87,7 +93,8 @@ def essai_tours(a, n_tours=10):
     d = diff(c0, compteurs(a))
     print(f"\n{'roue':>4} {'ticks':>7} {'ticks/tour':>11} {'théorie':>8}  encSign")
     for r, x in zip(ROUES, d):
-        print(f"{r:>4} {x:>7d} {abs(x) / n_tours:>11.1f} {TICKS_TOUR_THEO:>8.1f}  {1 if x >= 0 else -1:>4d}")
+        hs = "  (encodeur HS, ignoré)" if r in cfg.ROUES_HS else ""
+        print(f"{r:>4} {x:>7d} {abs(x) / n_tours:>11.1f} {TICKS_TOUR_THEO:>8.1f}  {1 if x >= 0 else -1:>4d}{hs}")
     print("\n-> recopier la colonne encSign dans parameters.h (const int encSign[4]).")
     print("   Un compteur à ~0 : encodeur mal branché. Un écart > 5 % : tours mal comptés ou ticks perdus.")
 
@@ -110,7 +117,7 @@ def essai_vmax(a, niveaux=(40, 60, 80, 100, 150, 200, 255), duree=2.0):
     finally:
         consigne(a, 0)
     ecrire_csv("vmax", ["pwm"] + [f"v_{r}" for r in ROUES], lignes)
-    vmax = sum(abs(x) for x in lignes[-1][1:]) / 4
+    vmax = moyenne_valides(lignes[-1][1:])
     print(f"\nVMAX moyen à PWM 255 : {vmax:.0f} ticks/s (théorie à vide sous 6 V : {VMAX_THEO:.0f})")
     print(f"-> parameters.h : #define VMAX_TICKS {0.9 * vmax:.0f}.0f")
     print("   (90 % du max mesuré, pour garder de la marge au PI quand la batterie baisse et sous charge)")
@@ -145,6 +152,9 @@ def essai_echelon(a, c=100, duree=2.0):
     fin = palier[len(palier) // 2:]
     print(f"\nvitesse attendue : {c / k:.0f} ticks/s  (= {c} x VMAX_TICKS / 255)")
     for i, r in enumerate(ROUES):
+        if r in cfg.ROUES_HS:
+            print(f"{r} : encodeur HS, recopie la PWM d'une autre roue (non régulée)")
+            continue
         v = [l[2 + i] for l in palier]
         v_fin = sum(l[2 + i] for l in fin) / len(fin)
         p_fin = sum(l[6 + i] for l in fin) / len(fin)
@@ -166,7 +176,7 @@ def essai_distance(a, metres=3.0, repetitions=3):
         c0 = compteurs(a)
         input("Robot sur l'arrivée, Entrée...")
         d = [abs(x) for x in diff(c0, compteurs(a))]
-        moy = sum(d) / 4
+        moy = moyenne_valides(d)
         scales.append(metres / moy)
         print("  ticks : " + "  ".join(f"{r} {x}" for r, x in zip(ROUES, d))
               + f"  -> {metres / moy:.3e} m/tick")
