@@ -16,8 +16,7 @@ LARGEUR, HAUTEUR = 320, 240
 CAMERA_HFLIP, CAMERA_VFLIP = 1, 1
 
 # ---------------------------------------------------------------- suivi de ligne
-# [PI] les consignes moteur (commande C, -255..255) sont des consignes de VITESSE :
-#      255 <-> VMAX_TICKS ticks/s (parameters.h de l'Arduino), soit env. 0,87 m/s
+
 VITESSE = 100                     # consigne de vitesse, entre -255 et 255
 KP = 50
 VITESSE_DEMARRAGE = 100          # (À RÉGLER) consigne pendant le coup de démarrage
