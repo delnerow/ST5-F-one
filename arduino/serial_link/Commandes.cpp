@@ -98,11 +98,12 @@ void SINGLEMOTOR_code() {
     }
     //mx->setvalue(nivM) ;
     setpoint[m-'0'-1] = nivM;
+    bool avanceDemandee = nivM > 0;
 
     // [MUET] priorité au capteur muet : l'état obstacle n'est plus mis à jour
     if (muet)
         RetAcquit(F("MU capteur ultrason muet moteur non allumé"));
-    else if (obst==false)
+    else if (!obst || !avanceDemandee)
         RetAcquit(F("OK Moteur mis à la consigne : "),(int)(m-'0'),nivM);
     else
         RetAcquit(F("OB stacle détecté moteur non allumé"));
@@ -137,12 +138,13 @@ void QUADMOTOR_code() {
   setpoint[1] = nivM2;
   setpoint[2] = nivM3;
   setpoint[3] = nivM4;
+  bool avanceDemandee = (nivM1 + nivM2 + nivM3 + nivM4) > 0;
 
   //reponse de la commande
   // [MUET] priorité au capteur muet : l'état obstacle n'est plus mis à jour
   if (muet)
         RetAcquit(F("MU capteur ultrason muet moteur non allumé"));
-  else if (obst==false)
+  else if (!obst || !avanceDemandee)
         RetAcquit(F("OK Moteurs mis aux consignes : "),nivM1,nivM2,nivM3,nivM4);
   else
         RetAcquit(F("OB stacle détecté moteur non allumé"));

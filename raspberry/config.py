@@ -54,7 +54,7 @@ APPROACH_OFFSET_M = 0.10         # (À CALIBRER) distance restant à parcourir e
 MAX_K_ERROR = 0.7                # écart max (en cases) entre l'encodeur et un nœud candidat
 
 # ---------------------------------------------------------------- obstacles (ultrasons)
-OBSTACLE_MIN_DISTANCE_CM = 20
+OBSTACLE_MIN_DISTANCE_CM = 25
 OBSTACLE_MAX_DISTANCE_CM = 200
 OBSTACLE_CONFIRMATION_MEASURES = 10
 OBSTACLE_FIRST_INTERSECTION_MAX_CM = 140
