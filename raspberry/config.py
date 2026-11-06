@@ -31,7 +31,7 @@ VITESSE_ROTATION = 70
 DISTANCE_DETECTION = 1
 TEMPS_FINAL = 1
 TEMPS_MIN_ROTATION = 0.5
-ERREUR_ALIGNEE = 0.15
+ERREUR_ALIGNEE = 0.25
 IMAGES_SANS_INTER = 10
 
 # ---------------------------------------------------------------- obstacle : attente puis demi-tour
