@@ -1,37 +1,80 @@
 import cv2
 import numpy as np
+import time 
 
 # Paramètres (ligne)
-TAILLE_FLOU = (5, 5)      # TP : (9,9)  -> plus petit, l'image est plus petite
-ECART = 60                # TP : seuil fixe 180 -> ici la ligne doit être 60 niveaux de gris
-                          #      plus claire que le sol (le sol = médiane de l'image)
-NOYAU = np.ones((3, 3), np.uint8)   # TP : 9x9
-ITERATIONS = 1            # TP : 12     -> 1 suffit et coûte beaucoup moins cher
-HAUT_ZONE = 0.6           # CORRIGÉ : find_line ne regarde que le bas de l'image (40 % du bas)
-AIRE_MIN = 100            # AJOUT : contour trop petit = poussière, pas la ligne
+TAILLE_FLOU = (5, 5)      
+ECART = 60                
+                          
+NOYAU = np.ones((3, 3), np.uint8)   
+ITERATIONS = 1            
+HAUT_ZONE = 0.6           
+AIRE_MIN = 100            
 # Paramètres (intersection)
 ZONE_HAUT = 0.2      # on cherche l'intersection entre 20 % et 90 % de la hauteur de l'image
 ZONE_BAS = 0.9
 RATIO = 1.5          # une rangée est transversale si son blanc continu depuis un bord dépasse 1,5 fois la ligne
 RANGEES_MIN = 3      # il faut au moins 3 rangées transversales (sinon c'est du bruit)
-BORD = 0.08          # CORRIGÉ : une branche latérale doit arriver à moins de 8 % du bord de l'image
+BORD = 0.08          # une branche latérale doit arriver à moins de 8 % du bord de l'image
 
 
 def traitement(image):
-    """1er traitement de l'image, commun à la ligne et à l'intersection."""
+    """1er traitement de l'image avec chronométrage et affichages de débogage."""
+    # Lancement du chronomètre global
+    t_start_global = time.perf_counter()
+
     h, w = image.shape[:2]
-    # Convert to gray scale image
+    
+    # 1. Niveaux de gris
+    t0 = time.perf_counter()
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    t1 = time.perf_counter()
+    print(f"Temps Niveaux de gris : {(t1 - t0) * 1000:.2f} ms")
+    cv2.imshow("1 - Niveaux de gris", gray)
 
-    # Blur and threshold
+    # 2. Floutage
+    t0 = time.perf_counter()
     blur = cv2.blur(gray, TAILLE_FLOU)
-    seuil = np.percentile(blur,10) + ECART
-    ret, thresh = cv2.threshold(blur, seuil, 255, cv2.THRESH_BINARY)
+    t1 = time.perf_counter()
+    print(f"Temps Floutage        : {(t1 - t0) * 1000:.2f} ms")
+    cv2.imshow("2 - Floutage", blur)
 
-    # Remove noise with morphological processing
+    # 3. Binarisation (Seuil adaptatif)
+    t0 = time.perf_counter()
+    seuil = np.percentile(blur, 10) + ECART
+    ret, thresh = cv2.threshold(blur, seuil, 255, cv2.THRESH_BINARY)
+    t1 = time.perf_counter()
+    print(f"Temps Binarisation    : {(t1 - t0) * 1000:.2f} ms")
+    cv2.imshow("3 - Binarisation", thresh)
+
+    # 4. Érosion
+    t0 = time.perf_counter()
     eroded_mask = cv2.erode(thresh, NOYAU, iterations=ITERATIONS)
+    t1 = time.perf_counter()
+    print(f"Temps Erosion         : {(t1 - t0) * 1000:.2f} ms")
+    cv2.imshow("4 - Erosion", eroded_mask)
+
+    # 5. Dilatation
+    t0 = time.perf_counter()
     closed_mask = cv2.dilate(eroded_mask, NOYAU, iterations=ITERATIONS)
+    t1 = time.perf_counter()
+    print(f"Temps Dilatation      : {(t1 - t0) * 1000:.2f} ms")
+    cv2.imshow("5 - Dilatation", closed_mask)
+
+    # Bilan global et calcul de la fréquence (FPS)
+    t_end_global = time.perf_counter()
+    temps_global = t_end_global - t_start_global
+    fps = 1.0 / temps_global if temps_global > 0 else 0
+
+    print(f"> TEMPS GLOBAL        : {temps_global * 1000:.2f} ms")
+    print(f"> FREQUENCE MAX       : {fps:.1f} FPS")
+    print("-" * 40)
+
+    # Instruction obligatoire pour demander à OpenCV de dessiner/actualiser les fenêtres
+    cv2.waitKey(1)
+
     return closed_mask, h
+    
 
 
 def find_line(closed_mask, h):
