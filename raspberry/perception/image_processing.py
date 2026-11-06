@@ -3,19 +3,19 @@ import numpy as np
 import time 
 
 # Paramètres (ligne)
-TAILLE_FLOU = (5, 5)      # TP : (9,9)  -> plus petit, l'image est plus petite
-ECART = 60                # TP : seuil fixe 180 -> ici la ligne doit être 60 niveaux de gris
-                          #      plus claire que le sol (le sol = médiane de l'image)
-NOYAU = np.ones((3, 3), np.uint8)   # TP : 9x9
-ITERATIONS = 1            # TP : 12     -> 1 suffit et coûte beaucoup moins cher
-HAUT_ZONE = 0.6           # CORRIGÉ : find_line ne regarde que le bas de l'image (40 % du bas)
-AIRE_MIN = 100            # AJOUT : contour trop petit = poussière, pas la ligne
+TAILLE_FLOU = (5, 5)      
+ECART = 60                
+                          
+NOYAU = np.ones((3, 3), np.uint8)   
+ITERATIONS = 1            
+HAUT_ZONE = 0.6           
+AIRE_MIN = 100            
 # Paramètres (intersection)
 ZONE_HAUT = 0.2      # on cherche l'intersection entre 20 % et 90 % de la hauteur de l'image
 ZONE_BAS = 0.9
 RATIO = 1.5          # une rangée est transversale si son blanc continu depuis un bord dépasse 1,5 fois la ligne
 RANGEES_MIN = 3      # il faut au moins 3 rangées transversales (sinon c'est du bruit)
-BORD = 0.08          # CORRIGÉ : une branche latérale doit arriver à moins de 8 % du bord de l'image
+BORD = 0.08          # une branche latérale doit arriver à moins de 8 % du bord de l'image
 
 
 def traitement(image):
