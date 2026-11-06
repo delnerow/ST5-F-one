@@ -21,7 +21,7 @@ CAMERA_HFLIP, CAMERA_VFLIP = 1, 1
 VITESSE = 100                     # consigne de vitesse, entre -255 et 255
 KP = 50
 VITESSE_DEMARRAGE = 100          # (À RÉGLER) consigne pendant le coup de démarrage
-                                 # [PI] probablement inutile en boucle fermée (mettre = VITESSE)
+                                
 TEMPS_DEMARRAGE = 0.5            # s
 ZONE_MORTE = 0.08                          # terme dérivé (0 = désactivé)
 INTEGRALE_MAX = 0.5              # limite de l'intégrale, pour qu'elle ne s'emballe pas
