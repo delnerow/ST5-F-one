@@ -4,6 +4,7 @@
 #   python3 calibration.py vmax                   roues levées, firmware BOUCLE_FERMEE 0 : caractéristique PWM -> vitesse
 #   python3 calibration.py echelon    [consigne]  roues levées, firmware BOUCLE_FERMEE 1 : réponse indicielle du PI
 #   python3 calibration.py distance   [metres]    au sol, moteurs coupés, robot poussé à la main : ENCODER_SCALE
+#   python3 calibration.py rotation   [consigne]  au sol, surface dégagée : durée des rotations 90°/180°
 #
 # Les mesures sont enregistrées en CSV dans essais/ (essai echelon : analyse avec ordinateur/analyse_echelon.py).
 # La protection ultrason est désactivée pendant les essais (le capteur voit souvent la table).
@@ -81,6 +82,31 @@ def moyenne_valides(valeurs):
     """Moyenne des |valeurs| des roues dont l'encodeur n'est pas HS (config.ROUES_HS)."""
     v = [abs(x) for r, x in zip(ROUES, valeurs) if r not in cfg.ROUES_HS]
     return sum(v) / len(v)
+
+
+def estimer_rotation(mesures):
+    """Ajuste angle = pente * durée + décalage sur les mesures d'une direction."""
+    if len(mesures) < 3:
+        return None
+    durees = [duree for duree, _ in mesures]
+    angles = [angle for _, angle in mesures]
+    moyenne_duree = sum(durees) / len(durees)
+    moyenne_angle = sum(angles) / len(angles)
+    variance = sum((duree - moyenne_duree) ** 2 for duree in durees)
+    if variance == 0:
+        return None
+    pente = sum(
+        (duree - moyenne_duree) * (angle - moyenne_angle)
+        for duree, angle in mesures
+    ) / variance
+    decalage = moyenne_angle - pente * moyenne_duree
+    if pente <= 0:
+        return None
+    return {
+        angle: (angle - decalage) / pente
+        for angle in (90, 180)
+        if (angle - decalage) > 0
+    }
 
 
 # ---------------------------------------------------------------- essai 1 : ticks par tour
@@ -187,14 +213,157 @@ def essai_distance(a, metres=3.0, repetitions=3):
     print("-> recopier dans config.py. Des roues qui diffèrent de > 3 % : patinage ou poussée en biais.")
 
 
+# ---------------------------------------------------------------- essai 5 : temps de rotation
+def essai_rotation(a, vitesse=cfg.VITESSE_ROTATION):
+    if not 1 <= vitesse <= 255:
+        raise ValueError("La consigne de rotation doit être comprise entre 1 et 255.")
+
+    durees = (0.20, 0.35, 0.50, 0.70, 0.90, 1.10)
+    lignes = []
+    mesures = {"gauche": [], "droite": []}
+    print(
+        f"Rotation à la consigne {vitesse}. Utilisez une surface plane et dégagée, "
+        "marquez le cap de départ et gardez l'arrêt d'urgence accessible."
+    )
+    print("Attention : les essais de calibration désactivent la protection ultrason.")
+    print(
+        "Chaque essai commence avec le robot replacé sur le même repère. "
+        "Après chaque impulsion, mesurez l'angle réellement tourné."
+    )
+    input("Entrée pour continuer, Ctrl+C pour annuler...")
+
+    try:
+        for direction in ("gauche", "droite"):
+            print(f"\n--- Rotation {direction} ---")
+            for numero, duree in enumerate(durees, start=1):
+                reponse = input(
+                    f"Essai {numero}/{len(durees)} : replacez le robot au repère "
+                    f"de départ, puis Entrée pour tourner {duree:.2f} s "
+                    "(q pour terminer) : "
+                )
+                if reponse.strip().lower() == "q":
+                    break
+
+                compteurs_depart = compteurs(a)
+                commande = a.TurnLeft if direction == "gauche" else a.TurnRight
+                commande(vitesse, vitesse)
+                debut = time.monotonic()
+                mesures_essai = []
+
+                while time.monotonic() - debut < duree:
+                    vit = vitesses(a)
+                    compteurs_actuels = compteurs(a)
+                    temps = time.monotonic() - debut
+                    mesures_essai.append(
+                        {
+                            "sample_time_s": round(temps, 3),
+                            "vitesse_ticks_s": vit,
+                            "ticks_depuis_depart": diff(
+                                compteurs_depart, compteurs_actuels
+                            ),
+                        }
+                    )
+                    time.sleep(0.05)
+
+                a.Stop()
+                temps_commande = time.monotonic() - debut
+                fin_repos = time.monotonic() + 0.4
+                while time.monotonic() < fin_repos:
+                    vit = vitesses(a)
+                    compteurs_actuels = compteurs(a)
+                    mesures_essai.append(
+                        {
+                            "sample_time_s": round(time.monotonic() - debut, 3),
+                            "vitesse_ticks_s": vit,
+                            "ticks_depuis_depart": diff(
+                                compteurs_depart, compteurs_actuels
+                            ),
+                        }
+                    )
+                    time.sleep(0.05)
+
+                compteurs_fin = compteurs(a)
+                deltas = diff(compteurs_depart, compteurs_fin)
+                reponse_angle = input(
+                    "Angle réellement tourné en degrés (positif; Entrée pour ignorer) : "
+                ).strip()
+                angle = float(reponse_angle) if reponse_angle else None
+                if angle is not None and (not math.isfinite(angle) or angle <= 0):
+                    raise ValueError("L'angle mesuré doit être un nombre positif.")
+                if angle is not None:
+                    mesures[direction].append((temps_commande, angle))
+
+                for mesure in mesures_essai:
+                    lignes.append(
+                        [
+                            direction,
+                            numero,
+                            vitesse,
+                            duree,
+                            round(temps_commande, 3),
+                            angle if angle is not None else "",
+                            mesure["sample_time_s"],
+                            *mesure["vitesse_ticks_s"],
+                            *mesure["ticks_depuis_depart"],
+                        ]
+                    )
+
+                print(
+                    f"  durée={temps_commande:.2f} s, angle={angle if angle is not None else 'ignoré'}°, "
+                    f"ticks FR/FL/RR/RL={deltas}, vitesses finales={vitesses(a)} ticks/s"
+                )
+            else:
+                continue
+            break
+    finally:
+        if lignes:
+            ecrire_csv(
+                "rotation",
+                [
+                    "direction",
+                    "essai",
+                    "consigne",
+                    "duree_demandee_s",
+                    "duree_commande_s",
+                    "angle_mesure_deg",
+                    "temps_echantillon_s",
+                    "vitesse_FR_ticks_s",
+                    "vitesse_FL_ticks_s",
+                    "vitesse_RR_ticks_s",
+                    "vitesse_RL_ticks_s",
+                    "ticks_FR",
+                    "ticks_FL",
+                    "ticks_RR",
+                    "ticks_RL",
+                ],
+                lignes,
+            )
+
+    print("\nEstimations à partir des essais mesurés :")
+    for direction, essais in mesures.items():
+        estimations = estimer_rotation(essais)
+        if estimations is None:
+            print(f"  {direction} : au moins 3 angles mesurés sont nécessaires.")
+            continue
+        for angle, duree in estimations.items():
+            print(f"  {direction} {angle}° : environ {duree:.2f} s")
+    print("Les estimations sont propres à cette consigne, cette batterie et ce sol.")
+
+
 # ---------------------------------------------------------------- main
 VMAX_TICKS_FIRMWARE = 1000.0          # à garder égal à VMAX_TICKS de parameters.h (pour l'essai echelon)
 
-ESSAIS = {"tours": essai_tours, "vmax": essai_vmax, "echelon": essai_echelon, "distance": essai_distance}
+ESSAIS = {
+    "tours": essai_tours,
+    "vmax": essai_vmax,
+    "echelon": essai_echelon,
+    "distance": essai_distance,
+    "rotation": essai_rotation,
+}
 
 if __name__ == "__main__":
     if len(sys.argv) < 2 or sys.argv[1] not in ESSAIS:
-        print("usage : python3 calibration.py {tours|vmax|echelon|distance} [paramètre]")
+        print("usage : python3 calibration.py {tours|vmax|echelon|distance|rotation} [paramètre]")
         sys.exit(1)
     args = [float(x) if "." in x else int(x) for x in sys.argv[2:]]
     a = connecter()

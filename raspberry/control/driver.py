@@ -35,7 +35,9 @@ class Driver:
         self.choix = None
         self.sens = None              # 'gauche' ou 'droite' pendant une rotation
         self.quarts = 0               # nombre de quarts de tour restants
+        self.angle_rotation = 90
         self.debut = 0.0
+        self.images_alignees_rotation = 0
         self.votes = {d: 0 for d in DIRECTIONS}
         self.nb_images = 0
         self.integrale = 0.0          # erreur accumulée (terme I)
@@ -113,7 +115,11 @@ class Driver:
             self.stop()
             self.etat = "ARRET"
             return
+        if sens not in ("gauche", "droite") or quarts not in (1, 2):
+            raise ValueError("Une rotation doit être gauche/droite et faire 1 ou 2 quarts de tour.")
         self.sens, self.quarts = sens, quarts
+        self.angle_rotation = quarts * 90
+        self.images_alignees_rotation = 0
         self.etat, self.debut = "TOURNE", time.perf_counter()
 
     def _abort_if_requested(self):
@@ -207,23 +213,41 @@ class Driver:
                     self.etat = "SUIVI"
                 else:
                     self.etat, self.debut, self.quarts = "TOURNE", t, 1
+                    self.angle_rotation = 90
+                    self.images_alignees_rotation = 0
                 return ("CENTERED", None)
 
         elif self.etat == "TOURNE":
+            temps_min, temps_max = cfg.TEMPS_ROTATION[self.sens][self.angle_rotation]
+            if temps_min < 0 or temps_max < temps_min:
+                raise ValueError(
+                    f"Durées de rotation invalides pour {self.sens} {self.angle_rotation}°."
+                )
+            temps_rotation = t - self.debut
+            vitesse_rotation = (
+                cfg.VITESSE_BALAYAGE_ROTATION
+                if temps_rotation >= temps_max
+                else cfg.VITESSE_ROTATION
+            )
             if self.sens == 'gauche':
-                self.moteurs(-cfg.VITESSE_ROTATION, cfg.VITESSE_ROTATION)
+                self.moteurs(-vitesse_rotation, vitesse_rotation)
             else:
-                self.moteurs(cfg.VITESSE_ROTATION, -cfg.VITESSE_ROTATION)
-            if t - self.debut > cfg.TEMPS_MIN_ROTATION and ligne is not None: # on ne veut pas identifier la meme ligne que celle qu'on vient de quitter
-                cx, _ = ligne
-                if abs((cx - cfg.LARGEUR / 2) / (cfg.LARGEUR / 2)) < cfg.ERREUR_ALIGNEE:
-                    self.quarts -= 1
-                    if self.quarts > 0:
-                        self.debut = t          # quart de tour suivant : on quitte d'abord la ligne
+                self.moteurs(vitesse_rotation, -vitesse_rotation)
+            if temps_rotation >= temps_min:
+                if ligne is None:
+                    self.images_alignees_rotation = 0
+                else:
+                    cx, _ = ligne
+                    erreur = abs((cx - cfg.LARGEUR / 2) / (cfg.LARGEUR / 2))
+                    if erreur < cfg.ERREUR_ALIGNEE:
+                        self.images_alignees_rotation += 1
                     else:
-                        self.integrale, self.erreur_prec = 0.0, None
-                        self.etat = "SUIVI"
-                        return ("TURN_DONE", None)
+                        self.images_alignees_rotation = 0
+                if self.images_alignees_rotation >= cfg.IMAGES_ALIGNEES_ROTATION:
+                    self.quarts = 0
+                    self.integrale, self.erreur_prec = 0.0, None
+                    self.etat = "SUIVI"
+                    return ("TURN_DONE", None)
         elif self.etat == "DEMI_TOUR":
             if self.sens == 'gauche':
                 self.moteurs(-cfg.VITESSE_ROTATION, cfg.VITESSE_ROTATION)

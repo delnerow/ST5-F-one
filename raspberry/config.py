@@ -27,10 +27,21 @@ ZONE_MORTE = 0.08                          # terme dérivé (0 = désactivé)
 INTEGRALE_MAX = 0.5              # limite de l'intégrale, pour qu'elle ne s'emballe pas
 # ---------------------------------------------------------------- intersections
 VITESSE_LENTE = 45
-VITESSE_ROTATION = 70
+VITESSE_ROTATION = 120
 DISTANCE_DETECTION = 1
 TEMPS_FINAL = 1
-TEMPS_MIN_ROTATION = 0.5
+TEMPS_ROTATION = {              # secondes (minimum, maximum) à calibrer à VITESSE_ROTATION
+    "gauche": {
+        90: (0.5, 1.0),
+        180: (1.0, 2.0),
+    },
+    "droite": {
+        90: (0.5, 1.0),
+        180: (1.0, 2.0),
+    },
+}
+VITESSE_BALAYAGE_ROTATION = 45  # consigne de rotation après le temps maximum, jusqu'à retrouver la ligne
+IMAGES_ALIGNEES_ROTATION = 3    # nombre d'images centrées consécutives avant de finir le virage
 ERREUR_ALIGNEE = 0.15
 IMAGES_SANS_INTER = 10
 
