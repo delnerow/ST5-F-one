@@ -32,7 +32,7 @@ const int Encoder4A = 34;  // encoder direction pin -> yellow
 // [PI] régulation de vitesse en boucle fermée (task2, toutes les 20 ms)
 //   La consigne de la commande C (-255..255) devient une consigne de VITESSE :
 //   255 <-> VMAX_TICKS ticks/s. Les vitesses mesurées sont renvoyées par la question P (ticks/s).
-#define BOUCLE_FERMEE 1          // 0 = ancienne rampe sur la PWM (boucle ouverte)
+#define BOUCLE_FERMEE 0          // 0 = ancienne rampe sur la PWM (boucle ouverte)
 #define VMAX_TICKS    1000.0f    // (À CALIBRER) ticks/s mesurés à PWM 255, roues levées, BOUCLE_FERMEE 0
                                  // théorique : 280 tr/min à vide sous 6 V x 234,3 ticks/tr roue / 60 = 1090
 #define KFF_V         1.0f       // anticipation (1 si VMAX_TICKS est bien calibré)
