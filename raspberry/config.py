@@ -24,7 +24,7 @@ VITESSE_DEMARRAGE = 100          # (À RÉGLER) consigne pendant le coup de dém
                                 
 TEMPS_DEMARRAGE = 0.5            # s
 ZONE_MORTE = 0.08                          # terme dérivé (0 = désactivé)
-INTEGRALE_MAX = 0.5              # limite de l'intégrale, pour qu'elle ne s'emballe pas
+
 # ---------------------------------------------------------------- intersections
 VITESSE_LENTE = 45
 VITESSE_ROTATION = 70
