@@ -56,7 +56,7 @@ MAX_K_ERROR = 0.7                # écart max (en cases) entre l'encodeur et un 
 # ---------------------------------------------------------------- obstacles (ultrasons)
 OBSTACLE_MIN_DISTANCE_CM = 20
 OBSTACLE_MAX_DISTANCE_CM = 200
-OBSTACLE_CONFIRMATION_MEASURES = 5
+OBSTACLE_CONFIRMATION_MEASURES = 10
 OBSTACLE_FIRST_INTERSECTION_MAX_CM = 140
 OBSTACLE_SECOND_INTERSECTION_MIN_CM = 160
 LOG_PERIOD_S = 1.0
