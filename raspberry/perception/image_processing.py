@@ -19,7 +19,7 @@ BORD = 0.08          # une branche latérale doit arriver à moins de 8 % du bor
 
 
 def traitement(image):
-"""1er traitement de l'image, commun à la ligne et à l'intersection."""
+    """1er traitement de l'image, commun à la ligne et à l'intersection."""
     h, w = image.shape[:2]
     # Convert to gray scale image
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
