@@ -19,60 +19,19 @@ BORD = 0.08          # une branche latérale doit arriver à moins de 8 % du bor
 
 
 def traitement(image):
-    """1er traitement de l'image avec chronométrage et affichages de débogage."""
-    # Lancement du chronomètre global
-    t_start_global = time.perf_counter()
-
+    """1er traitement de l'image, commun à la ligne et à l'intersection."""
     h, w = image.shape[:2]
-    
-    # 1. Niveaux de gris
-    t0 = time.perf_counter()
+    # Convert to gray scale image
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    t1 = time.perf_counter()
-    print(f"Temps Niveaux de gris : {(t1 - t0) * 1000:.2f} ms")
-    cv2.imshow("1 - Niveaux de gris", gray)
 
-    # 2. Floutage
-    t0 = time.perf_counter()
+    # Blur and threshold
     blur = cv2.blur(gray, TAILLE_FLOU)
-    t1 = time.perf_counter()
-    print(f"Temps Floutage        : {(t1 - t0) * 1000:.2f} ms")
-    cv2.imshow("2 - Floutage", blur)
-
-    # 3. Binarisation (Seuil adaptatif)
-    t0 = time.perf_counter()
-    seuil = np.percentile(blur, 10) + ECART
+    seuil = np.percentile(blur,10) + ECART
     ret, thresh = cv2.threshold(blur, seuil, 255, cv2.THRESH_BINARY)
-    t1 = time.perf_counter()
-    print(f"Temps Binarisation    : {(t1 - t0) * 1000:.2f} ms")
-    cv2.imshow("3 - Binarisation", thresh)
 
-    # 4. Érosion
-    t0 = time.perf_counter()
+    # Remove noise with morphological processing
     eroded_mask = cv2.erode(thresh, NOYAU, iterations=ITERATIONS)
-    t1 = time.perf_counter()
-    print(f"Temps Erosion         : {(t1 - t0) * 1000:.2f} ms")
-    cv2.imshow("4 - Erosion", eroded_mask)
-
-    # 5. Dilatation
-    t0 = time.perf_counter()
     closed_mask = cv2.dilate(eroded_mask, NOYAU, iterations=ITERATIONS)
-    t1 = time.perf_counter()
-    print(f"Temps Dilatation      : {(t1 - t0) * 1000:.2f} ms")
-    cv2.imshow("5 - Dilatation", closed_mask)
-
-    # Bilan global et calcul de la fréquence (FPS)
-    t_end_global = time.perf_counter()
-    temps_global = t_end_global - t_start_global
-    fps = 1.0 / temps_global if temps_global > 0 else 0
-
-    print(f"> TEMPS GLOBAL        : {temps_global * 1000:.2f} ms")
-    print(f"> FREQUENCE MAX       : {fps:.1f} FPS")
-    print("-" * 40)
-
-    # Instruction obligatoire pour demander à OpenCV de dessiner/actualiser les fenêtres
-    cv2.waitKey(1)
-
     return closed_mask, h
     
 

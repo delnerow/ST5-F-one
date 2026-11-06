@@ -48,6 +48,7 @@ CELL_M = 1.0                     # (À CALIBRER) distance entre deux intersectio
 # GetSpeed() renvoie des ticks/s (front descendant de la voie B : 11 ticks/tr moteur,
 # réducteur 1:21,3 -> 234,3 ticks/tr roue). Roue Ø65 mm : pi x 0,065 / 234,3 = 8,72e-4 m/tick.
 ENCODER_SCALE = 8.72e-4          # (À CALIBRER) m/tick : 3 m poussé à la main / nb moyen de ticks
+ROUES_HS = ("FL",)              # roues à encodeur HS (cf. copieDe dans parameters.h) : ignorées par calibration.py
 ENCODER_SIGN = 1                 # signe déjà corrigé par encSign dans parameters.h de l'Arduino
 APPROACH_OFFSET_M = 0.10         # (À CALIBRER) distance restant à parcourir entre l'événement
                                  # "intersection vue" et le centre du carrefour (phase AVANCE)

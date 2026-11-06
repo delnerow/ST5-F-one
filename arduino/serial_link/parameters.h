@@ -42,6 +42,11 @@ const int Encoder4A = 34;  // encoder direction pin -> yellow
 // (À CALIBRER) -1 si le compteur de la roue diminue quand elle tourne en marche avant
 //                     FR  FL  RR  RL
 const int encSign[4] = { 1,  1,  1,  1 };
+// Encodeur HS : la roue recopie la commande (PWM) du PI d'une autre roue du même côté,
+// et sa vitesse mesurée (question P) est remplacée par celle de cette roue.
+// -1 = encodeur valide. Ex. : FL HS -> copieDe[1] = 3 (RL).
+//                     FR  FL  RR  RL
+const int copieDe[4] = { -1,  3, -1, -1 };
 
 // [OBSTACLE] capteur ultrason URM37 en mode automatique (une mesure toutes les 25 ms)
 const int URM_ECHO = 2;                  // sortie PWM du capteur (fil vert) -> broche 2 (INT0)
