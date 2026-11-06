@@ -22,7 +22,7 @@ KP = 50
 VITESSE_DEMARRAGE = 100          # (À RÉGLER) consigne pendant le coup de démarrage
                                 
 TEMPS_DEMARRAGE = 0.5            # s
-ZONE_MORTE = 0.08                          # terme dérivé (0 = désactivé)
+ZONE_MORTE = 0.08                         
 
 # ---------------------------------------------------------------- intersections
 VITESSE_LENTE = 45
